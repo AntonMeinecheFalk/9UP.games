@@ -4,6 +4,7 @@ import path from 'node:path';
 import { config, ROOT, editConfigured } from './config.js';
 import { editModeMiddleware } from './auth.js';
 import { registerRoutes } from './routes.js';
+import { shutdownDb } from './db.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -32,13 +33,14 @@ app.use((req, res, next) => {
 // Determine edit mode for every request.
 app.use(editModeMiddleware);
 
-// Static client assets (long cache; files are versioned by content rarely so
-// keep a modest cache to ease updates on a Pi).
-app.use(
-  '/css',
-  express.static(path.join(ROOT, 'public/css'), { maxAge: '1h' })
-);
-app.use('/js', express.static(path.join(ROOT, 'public/js'), { maxAge: '1h' }));
+// Static client assets. We use ETag/Last-Modified revalidation (maxAge: 0)
+// rather than a long max-age so that edits to CSS/JS show up on the next load
+// without forcing a hard refresh. Responses are tiny 304s when unchanged, which
+// is cheap even on a Pi. (Uploaded media, which has unique filenames, is still
+// cached aggressively — see the media routes.)
+const assetOpts = { maxAge: 0, etag: true, lastModified: true };
+app.use('/css', express.static(path.join(ROOT, 'public/css'), assetOpts));
+app.use('/js', express.static(path.join(ROOT, 'public/js'), assetOpts));
 
 registerRoutes(app);
 
@@ -57,7 +59,7 @@ app.use((err, req, res, next) => {
   res.status(status).type('html').send(`<h1>${status}</h1><p>${err.message || 'Server error'}</p>`);
 });
 
-app.listen(config.port, config.host, () => {
+const server = app.listen(config.port, config.host, () => {
   console.log(`9UP Games site listening on http://${config.host}:${config.port}`);
   console.log(`  DB:    ${config.dbPath}`);
   console.log(`  Media: ${config.mediaDir}`);
@@ -67,3 +69,24 @@ app.listen(config.port, config.host, () => {
     console.log('  Edit mode: enabled — unlock at /edit/<EDIT_SECRET>');
   }
 });
+
+// Graceful shutdown: stop accepting connections, checkpoint + close the DB so
+// `site.db` is fully consolidated before the process exits (systemd sends
+// SIGTERM on `systemctl stop`).
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`\n[shutdown] ${signal} — closing server and checkpointing DB.`);
+  server.close(() => {
+    shutdownDb();
+    process.exit(0);
+  });
+  // Fallback if connections linger.
+  setTimeout(() => {
+    shutdownDb();
+    process.exit(0);
+  }, 3000).unref();
+}
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

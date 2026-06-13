@@ -9,29 +9,30 @@ import { getMedia, mediaUrl, thumbUrl } from './media.js';
 export function renderDeckViewer(game, slides) {
   const slidesHtml = slides.length
     ? slides
-        .map(
-          (s, i) =>
-            `<section class="deck-slide ${i === 0 ? 'is-active' : ''}" data-slide-index="${i}">
-              <div class="deck-slide__inner">${s.data.blocks
-                .map(renderSlideBlock)
-                .join('')}</div>
-            </section>`
-        )
+        .map((s, i) => {
+          // Blurred, scaled copy of the slide's first image fills the letterbox
+          // bars behind the slide (only visible when the slide doesn't fill the
+          // screen, i.e. when not in true fullscreen).
+          const firstImg = s.data.blocks.find((b) => b.type === 'image' && b.mediaId);
+          const bgMedia = firstImg ? getMedia(firstImg.mediaId) : null;
+          const bg = bgMedia
+            ? `<img class="deck-slide__bg" src="${escapeHtml(mediaUrl(bgMedia))}" alt="" aria-hidden="true">`
+            : '';
+          return `<section class="deck-slide ${i === 0 ? 'is-active' : ''}" data-slide-index="${i}">
+              ${bg}
+              <div class="deck-slide__inner">${s.data.blocks.map(renderSlideBlock).join('')}</div>
+            </section>`;
+        })
         .join('')
     : '<section class="deck-slide is-active"><div class="deck-slide__inner"><p class="muted">This deck is empty.</p></div></section>';
 
+  const tri =
+    '<svg class="deck-arrow__tri" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L17.5 12 L9 18 Z"/></svg>';
   const body = `<div class="deck-viewer" data-deck-viewer tabindex="0">
     <div class="deck-stage">${slidesHtml}</div>
-    <div class="deck-controls">
-      <button class="deck-nav" data-deck-prev aria-label="Previous slide">‹</button>
-      <span class="deck-counter"><span data-deck-current>1</span> / ${Math.max(
-        slides.length,
-        1
-      )}</span>
-      <button class="deck-nav" data-deck-next aria-label="Next slide">›</button>
-      <button class="deck-fs" data-deck-fullscreen aria-label="Toggle fullscreen">⛶</button>
-      <a class="deck-exit" href="/game/${escapeHtml(game.slug)}">Close</a>
-    </div>
+    <button class="deck-arrow deck-arrow--prev" data-deck-prev aria-label="Previous slide">${tri}</button>
+    <button class="deck-arrow deck-arrow--next" data-deck-next aria-label="Next slide">${tri}</button>
+    <a class="deck-close" href="/game/${escapeHtml(game.slug)}" aria-label="Close presentation">✕</a>
   </div>`;
 
   return layout({
@@ -167,7 +168,8 @@ function renderBlockEditor(block, i) {
     case 'video': {
       const isFile = block.mode === 'file';
       const m = isFile ? getMedia(block.mediaId) : null;
-      inner = `<div class="block-video" data-media-id="${block.mediaId || ''}">
+      const thumb = block.thumbId ? getMedia(block.thumbId) : null;
+      inner = `<div class="block-video" data-media-id="${block.mediaId || ''}" data-thumb-id="${block.thumbId || ''}">
         <div class="seg">
           <label><input type="radio" name="bvmode-${i}" value="url" ${
         !isFile ? 'checked' : ''
@@ -182,6 +184,13 @@ function renderBlockEditor(block, i) {
         <div class="block-video__file" ${isFile ? '' : 'hidden'}>
           <button type="button" class="ctl" data-action="block-video-upload">Upload video</button>
           <span class="muted">${m ? escapeHtml(m.original_name) : 'no file'}</span>
+        </div>
+        <div class="block-video__thumb">
+          <div class="block-video__thumbpreview">${
+            thumb ? `<img src="${escapeHtml(mediaUrl(thumb))}" alt="">` : '<span class="muted">No thumbnail</span>'
+          }</div>
+          <button type="button" class="ctl" data-action="block-video-thumb">${thumb ? 'Change' : 'Add'} thumbnail</button>
+          ${thumb ? '<button type="button" class="ctl ctl--danger" data-action="block-video-thumb-remove">Remove</button>' : ''}
         </div>
       </div>`;
       break;

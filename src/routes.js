@@ -15,6 +15,9 @@ import {
   Submissions,
   Site,
   SECTION_TYPES,
+  THEME_COLOR_KEYS,
+  THEME_FONT_KEYS,
+  FONT_IDS,
 } from './models.js';
 import {
   upload,
@@ -31,11 +34,14 @@ import {
   renderAbout,
   renderPressKit,
   renderGamePage,
+  renderGamesPage,
   renderSubmissions,
 } from './pages.js';
 import { renderDeckViewer, renderDeckEditor } from './deckpage.js';
 
 // --- helpers ----------------------------------------------------------------
+const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
 const sendHtml = (res, html) =>
   res
     .type('html')
@@ -107,11 +113,13 @@ function sanitizeBlocks(rawBlocks) {
         case 'video': {
           const mode = b.mode === 'file' ? 'file' : 'url';
           const mediaId = intOrNull(b.mediaId);
+          const thumbId = intOrNull(b.thumbId);
           return {
             type: 'video',
             mode,
             url: mode === 'url' ? String(b.url || '').slice(0, 2000) : '',
             mediaId: mode === 'file' && mediaId && getMedia(mediaId) ? mediaId : null,
+            thumbId: thumbId && getMedia(thumbId) ? thumbId : null,
           };
         }
         default:
@@ -139,6 +147,7 @@ export function registerRoutes(app) {
 
   // ===== Public pages =====================================================
   app.get('/', (req, res) => sendHtml(res, renderHome(req.editMode)));
+  app.get('/games', (req, res) => sendHtml(res, renderGamesPage(req.editMode)));
   app.get('/about', (req, res) => sendHtml(res, renderAbout(req.editMode)));
   app.get('/press', (req, res) => sendHtml(res, renderPressKit(req.editMode)));
 
@@ -228,9 +237,17 @@ export function registerRoutes(app) {
     const fields = {};
     if ('title' in req.body) fields.title = String(req.body.title || '').slice(0, 200);
     if ('steam_url' in req.body) fields.steam_url = String(req.body.steam_url || '').slice(0, 2000);
+    if ('tagline' in req.body) fields.tagline = sanitizeRichHtml(req.body.tagline || '');
     if ('hero_media' in req.body) {
       const mid = intOrNull(req.body.hero_media);
       fields.hero_media = mid && getMedia(mid) ? mid : null;
+    }
+    if ('logo_media' in req.body) {
+      const mid = intOrNull(req.body.logo_media);
+      fields.logo_media = mid && getMedia(mid) ? mid : null;
+    }
+    if (req.body.display && typeof req.body.display === 'object') {
+      fields.display = req.body.display; // validated + clamped in Games.update
     }
     const game = Games.update(id, fields);
     if (!game) return res.status(404).json({ error: 'Game not found' });
@@ -302,7 +319,7 @@ export function registerRoutes(app) {
     res.json({ ok: true });
   });
 
-  // --- Settings (featured game, site title, mission) ---
+  // --- Settings (featured game, site title, mission, theme) ---
   app.post('/api/settings', requireEdit, (req, res) => {
     if ('featured_game_id' in req.body) {
       const gid = intOrNull(req.body.featured_game_id);
@@ -310,7 +327,27 @@ export function registerRoutes(app) {
     }
     if ('site_title' in req.body) Site.setTitle(String(req.body.site_title || '').slice(0, 200));
     if ('mission' in req.body) Site.setMission(sanitizeRichHtml(req.body.mission || ''));
-    res.json({ ok: true });
+    if ('parallax' in req.body) Site.setParallax(req.body.parallax);
+    if ('site_logo' in req.body) {
+      const mid = intOrNull(req.body.site_logo);
+      Site.setSiteLogo(mid && getMedia(mid) ? mid : null);
+    }
+
+    if (req.body.reset_theme) {
+      Site.resetTheme();
+    } else if (req.body.theme && typeof req.body.theme === 'object') {
+      const clean = {};
+      for (const k of THEME_COLOR_KEYS) {
+        const v = req.body.theme[k];
+        if (typeof v === 'string' && HEX_COLOR.test(v)) clean[k] = v;
+      }
+      for (const k of THEME_FONT_KEYS) {
+        const v = req.body.theme[k];
+        if (typeof v === 'string' && FONT_IDS.includes(v)) clean[k] = v;
+      }
+      if (Object.keys(clean).length) Site.setTheme(clean);
+    }
+    res.json({ ok: true, theme: Site.theme() });
   });
 
   // --- Media ---

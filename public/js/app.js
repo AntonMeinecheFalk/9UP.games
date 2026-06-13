@@ -19,6 +19,135 @@
     if (next) next.addEventListener('click', () => show(i + 1));
   });
 
+  // --- Custom scroll-position indicator (replaces the hidden native bar) -----
+  (function scrollIndicator() {
+    const el = document.createElement('div');
+    el.className = 'scroll-indicator';
+    el.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(el);
+    let raf = null;
+
+    // Track geometry: keep the pill below the (fixed) header with clearance, and
+    // a matching bottom margin — so its travel never overlaps the bar.
+    function metrics() {
+      const docH = document.documentElement.scrollHeight - window.innerHeight;
+      const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 64;
+      const topMin = headerH + 12;
+      const range = Math.max(1, window.innerHeight - el.offsetHeight - topMin - 12);
+      return { docH, topMin, range };
+    }
+    function update() {
+      raf = null;
+      const { docH, topMin, range } = metrics();
+      if (docH <= 4) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      const progress = Math.min(1, Math.max(0, window.scrollY / docH));
+      el.style.transform = `translateY(${(topMin + progress * range).toFixed(1)}px)`;
+    }
+    function onScroll() { if (raf == null) raf = requestAnimationFrame(update); }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+
+    // Drag to scroll, like a scrollbar thumb.
+    let dragging = false, startY = 0, startScroll = 0;
+    el.addEventListener('pointerdown', (e) => {
+      dragging = true; startY = e.clientY; startScroll = window.scrollY;
+      el.classList.add('is-dragging');
+      // Disable smooth scroll-behavior during the drag so it tracks the cursor
+      // 1:1 and snappily, instead of animating (rubber-banding) to each target.
+      document.documentElement.style.scrollBehavior = 'auto';
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const { docH, range } = metrics();
+      window.scrollTo(0, startScroll + ((e.clientY - startY) / range) * docH);
+    });
+    function endDrag(e) {
+      if (!dragging) return;
+      dragging = false; el.classList.remove('is-dragging');
+      document.documentElement.style.scrollBehavior = ''; // restore CSS (smooth)
+      try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+    el.addEventListener('pointerup', endDrag);
+    el.addEventListener('pointercancel', endDrag);
+
+    update();
+  })();
+
+  // --- Hero parallax (smoothed with a lerp so snappy scrolls stay smooth) ----
+  (function heroParallax() {
+    const media = document.querySelector('.hero__media');
+    if (!media) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const hero = media.closest('.hero');
+    let goal = 50;
+    let current = 50;
+    let raf = null;
+
+    // Parallax pans object-position-Y from the focus point downward as the hero
+    // scrolls out. Clamped to 0–100% so cover always fills (never a gap/edge).
+    function recompute() {
+      const cs = getComputedStyle(media);
+      const focusY = parseFloat(cs.getPropertyValue('--focus-y')) || 50;
+      const maxPan = parseFloat(cs.getPropertyValue('--hero-parallax-max')) || 0;
+      const h = hero.offsetHeight || 1;
+      // 0 when the hero top is at the viewport top, 1 when fully scrolled past.
+      const progress = Math.max(0, Math.min(1, -hero.getBoundingClientRect().top / h));
+      goal = Math.max(0, Math.min(100, focusY + progress * maxPan));
+    }
+    function tick() {
+      current += (goal - current) * 0.12; // lerp toward goal
+      if (Math.abs(goal - current) < 0.05) current = goal;
+      media.style.setProperty('--parallax-pos', current.toFixed(2) + '%');
+      raf = current === goal ? null : requestAnimationFrame(tick);
+    }
+    function onScroll() {
+      recompute();
+      if (raf == null) raf = requestAnimationFrame(tick);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    recompute();
+    current = goal;
+    media.style.setProperty('--parallax-pos', current.toFixed(2) + '%');
+  })();
+
+  // --- Games catalogue carousel (animated swipe) ----------------------------
+  document.querySelectorAll('[data-games-carousel]').forEach((root) => {
+    const track = root.querySelector('.games-track');
+    const slides = Array.from(root.querySelectorAll('.game-slide'));
+    const dots = Array.from(root.querySelectorAll('.games-dot'));
+    if (slides.length <= 1) return;
+    let i = 0;
+
+    function go(n) {
+      i = (n + slides.length) % slides.length; // wrap around
+      track.style.transform = `translateX(-${i * 100}%)`;
+      dots.forEach((d, k) => d.classList.toggle('is-active', k === i));
+    }
+
+    root.querySelector('[data-games-prev]')?.addEventListener('click', () => go(i - 1));
+    root.querySelector('[data-games-next]')?.addEventListener('click', () => go(i + 1));
+    dots.forEach((d) => d.addEventListener('click', () => go(parseInt(d.dataset.goto, 10))));
+
+    root.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') { go(i + 1); e.preventDefault(); }
+      else if (e.key === 'ArrowLeft') { go(i - 1); e.preventDefault(); }
+    });
+
+    // Touch / pointer swipe.
+    let startX = null;
+    root.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+    root.addEventListener('touchend', (e) => {
+      if (startX == null) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 50) go(dx < 0 ? i + 1 : i - 1);
+      startX = null;
+    });
+  });
+
   // --- Press-kit flow -------------------------------------------------------
   const flow = document.querySelector('[data-press-flow]');
   if (!flow) return;

@@ -71,6 +71,7 @@
           mode,
           url: el.querySelector('[data-block-vurl]').value,
           mediaId: parseInt(box.dataset.mediaId || '0', 10) || null,
+          thumbId: parseInt(box.dataset.thumbId || '0', 10) || null,
         });
       }
     });
@@ -208,6 +209,20 @@
           const m = await uploadFile('video/*');
           if (!m) return;
           blockEl.querySelector('.block-video').dataset.mediaId = m.id;
+          break;
+        }
+        case 'block-video-thumb': {
+          const m = await uploadFile('image/*');
+          if (!m) return;
+          const box = blockEl.querySelector('.block-video');
+          box.dataset.thumbId = m.id;
+          box.querySelector('.block-video__thumbpreview').innerHTML = `<img src="/media/${m.filename}" alt="">`;
+          break;
+        }
+        case 'block-video-thumb-remove': {
+          const box = blockEl.querySelector('.block-video');
+          box.dataset.thumbId = '';
+          box.querySelector('.block-video__thumbpreview').innerHTML = '<span class="muted">No thumbnail</span>';
           break;
         }
         case 'block-btn-add': {

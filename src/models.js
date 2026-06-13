@@ -2,6 +2,33 @@
 // rather than touching SQL directly.
 import { db, nowISO, getSetting, setSetting } from './db.js';
 
+// --- per-game hero/logo display settings ------------------------------------
+// Crop/focus + zoom of the hero image, and size/position of the logo.
+export const DEFAULT_DISPLAY = {
+  heroPosX: 50, heroPosY: 50, heroZoom: 100, // % (object-position + scale)
+  logoScale: 100, logoX: 0, logoY: 0,        // % size, px offsets
+};
+export function parseDisplay(raw) {
+  let d = {};
+  try {
+    d = JSON.parse(raw || '{}') || {};
+  } catch {
+    d = {};
+  }
+  const clamp = (v, min, max, def) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
+  };
+  return {
+    heroPosX: clamp(d.heroPosX, 0, 100, 50),
+    heroPosY: clamp(d.heroPosY, 0, 100, 50),
+    heroZoom: clamp(d.heroZoom, 100, 300, 100),
+    logoScale: clamp(d.logoScale, 20, 400, 100),
+    logoX: clamp(d.logoX, -600, 600, 0),
+    logoY: clamp(d.logoY, -600, 600, 0),
+  };
+}
+
 // --- slug helper ------------------------------------------------------------
 export function slugify(text, fallback = 'game') {
   const base = String(text || '')
@@ -52,16 +79,23 @@ export const Games = {
     const next = {
       title: fields.title ?? game.title,
       hero_media: fields.hero_media === undefined ? game.hero_media : fields.hero_media,
+      logo_media: fields.logo_media === undefined ? game.logo_media : fields.logo_media,
       steam_url: fields.steam_url ?? game.steam_url,
+      tagline: fields.tagline ?? game.tagline,
     };
+    // Merge + clamp display settings (hero crop/zoom, logo size/position).
+    const display =
+      fields.display !== undefined
+        ? JSON.stringify(parseDisplay(JSON.stringify({ ...parseDisplay(game.display), ...fields.display })))
+        : game.display;
     let slug = game.slug;
     if (fields.title !== undefined && fields.title !== game.title) {
       slug = uniqueSlug(fields.title, id);
     }
     db.prepare(
-      `UPDATE games SET title = ?, slug = ?, hero_media = ?, steam_url = ?, updated_at = ?
+      `UPDATE games SET title = ?, slug = ?, hero_media = ?, logo_media = ?, steam_url = ?, tagline = ?, display = ?, updated_at = ?
        WHERE id = ?`
-    ).run(next.title, slug, next.hero_media, next.steam_url, nowISO(), id);
+    ).run(next.title, slug, next.hero_media, next.logo_media, next.steam_url, next.tagline, display, nowISO(), id);
     return this.get(id);
   },
   delete(id) {
@@ -269,6 +303,49 @@ export const Submissions = {
   },
 };
 
+// --- site theme / palette / fonts -------------------------------------------
+// Editors can recolor and re-font the whole site. Stored as one JSON blob;
+// rendered into a <style> that overrides the CSS custom properties.
+export const THEME_COLOR_KEYS = [
+  'bg', 'surface', 'text', 'muted', 'border', 'accent', 'accent2', 'btnHighlight', 'btnShadow',
+];
+export const THEME_FONT_KEYS = ['headingFont', 'bodyFont'];
+// Back-compat alias (older code referenced THEME_KEYS for the colour pickers).
+export const THEME_KEYS = THEME_COLOR_KEYS;
+
+// Curated font choices. Google-hosted fonts load via an injected <link> only
+// when selected, and every stack ends in a system fallback so the site still
+// renders if the visitor is offline. `google` is the css2 family query string.
+export const FONTS = [
+  { id: 'system', label: 'System default', stack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" },
+  { id: 'poppins', label: 'Poppins', stack: "'Poppins', sans-serif", google: 'Poppins:wght@400;600;700;800' },
+  { id: 'nunito', label: 'Nunito (friendly)', stack: "'Nunito', sans-serif", google: 'Nunito:wght@400;600;700;800' },
+  { id: 'baloo', label: 'Baloo 2 (rounded)', stack: "'Baloo 2', system-ui, sans-serif", google: 'Baloo+2:wght@400;600;700;800' },
+  { id: 'fredoka', label: 'Fredoka (chunky)', stack: "'Fredoka', system-ui, sans-serif", google: 'Fredoka:wght@400;500;600;700' },
+  { id: 'quicksand', label: 'Quicksand', stack: "'Quicksand', sans-serif", google: 'Quicksand:wght@400;500;600;700' },
+  { id: 'comfortaa', label: 'Comfortaa (round)', stack: "'Comfortaa', system-ui, sans-serif", google: 'Comfortaa:wght@400;600;700' },
+  { id: 'inter', label: 'Inter (clean)', stack: "'Inter', sans-serif", google: 'Inter:wght@400;600;700;800' },
+  { id: 'space-grotesk', label: 'Space Grotesk', stack: "'Space Grotesk', sans-serif", google: 'Space+Grotesk:wght@400;500;600;700' },
+];
+export const FONT_IDS = FONTS.map((f) => f.id);
+export function fontById(id) {
+  return FONTS.find((f) => f.id === id) || FONTS[0];
+}
+
+export const DEFAULT_THEME = {
+  bg: '#0e0f13',
+  surface: '#1b1e27',
+  text: '#e8eaf0',
+  muted: '#9aa0ad',
+  border: '#2a2e3a',       // all hairlines: card/section borders, inputs, dividers
+  accent: '#6c5ce7',
+  accent2: '#00d1b2',
+  btnHighlight: '#ffffff', // top-rim highlight, screen blend
+  btnShadow: '#000000',    // drop shadow under buttons, multiply blend
+  headingFont: 'poppins',
+  bodyFont: 'nunito',
+};
+
 // --- site settings convenience ---------------------------------------------
 export const Site = {
   title: () => getSetting('site_title', '9UP Games'),
@@ -280,4 +357,32 @@ export const Site = {
     return v ? parseInt(v, 10) : null;
   },
   setFeaturedGameId: (v) => setSetting('featured_game_id', v ? String(v) : ''),
+  siteLogoId: () => {
+    const v = getSetting('site_logo', '');
+    return v ? parseInt(v, 10) : null;
+  },
+  setSiteLogo: (v) => setSetting('site_logo', v ? String(v) : ''),
+  parallax: () => {
+    const v = parseInt(getSetting('parallax', '50'), 10);
+    return Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 50;
+  },
+  setParallax: (v) => setSetting('parallax', String(Math.min(100, Math.max(0, parseInt(v, 10) || 0)))),
+  theme: () => {
+    let t = {};
+    try {
+      t = JSON.parse(getSetting('theme', '{}')) || {};
+    } catch {
+      t = {};
+    }
+    return { ...DEFAULT_THEME, ...t };
+  },
+  setTheme: (partial) => {
+    const next = { ...Site.theme(), ...(partial || {}) };
+    setSetting('theme', JSON.stringify(next));
+    return next;
+  },
+  resetTheme: () => {
+    setSetting('theme', JSON.stringify(DEFAULT_THEME));
+    return { ...DEFAULT_THEME };
+  },
 };

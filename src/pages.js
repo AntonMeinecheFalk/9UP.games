@@ -4,6 +4,7 @@ import {
   renderHero,
   renderSection,
   renderTeamCard,
+  renderGamesCarousel,
   addSectionMenu,
 } from './render.js';
 import { escapeHtml } from './sanitize.js';
@@ -15,10 +16,10 @@ export function renderHome(editMode) {
   const featuredId = Site.featuredGameId();
   const featured = (featuredId && Games.get(featuredId)) || games[0] || null;
 
-  let body = '';
-
-  if (editMode) {
-    body += `<div class="wrap toolbar">
+  // Featured-game controls (edit mode). Defined here, placed AFTER the hero so
+  // the hero stays the first element and can extend up behind the top bar.
+  const featuredToolbar = editMode
+    ? `<div class="wrap toolbar">
       <label class="ctl-inline">Featured game:
         <select data-action="set-featured">
           <option value="">— none —</option>
@@ -33,10 +34,13 @@ export function renderHome(editMode) {
         </select>
       </label>
       <button type="button" class="ctl" data-action="create-game">+ New game</button>
-    </div>`;
-  }
+    </div>`
+    : '';
+
+  let body = '';
 
   if (!featured) {
+    body += featuredToolbar;
     body += `<div class="wrap empty-state">
       <h1>${escapeHtml(Site.title())}</h1>
       <p class="muted">No featured game yet.${
@@ -47,6 +51,7 @@ export function renderHome(editMode) {
   }
 
   body += renderHero(featured, editMode);
+  body += featuredToolbar;
   body += `<div class="wrap sections" data-sections-owner="game" data-owner-id="${featured.id}">`;
   for (const section of Sections.list('game', featured.id)) {
     body += renderSection(section, editMode);
@@ -95,6 +100,22 @@ export function renderGamePage(game, editMode) {
   }
   body += `</div>`;
   return layout({ title: game.title, body, editMode, bodyClass: 'page-game' });
+}
+
+// --- Games catalogue page ---------------------------------------------------
+export function renderGamesPage(editMode) {
+  const games = Games.all();
+  let body = `<div class="wrap games-head">
+    <h1>Our games</h1>
+    <p class="lede">Swipe or use the arrows to browse the catalogue.</p>
+    ${
+      editMode
+        ? '<div class="toolbar"><button type="button" class="ctl" data-action="create-game">+ New game</button></div>'
+        : ''
+    }
+  </div>`;
+  body += renderGamesCarousel(games);
+  return layout({ title: 'Games', body, editMode, bodyClass: 'page-games' });
 }
 
 // --- About page -------------------------------------------------------------

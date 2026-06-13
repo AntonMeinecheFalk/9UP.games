@@ -184,6 +184,44 @@ notes that email delivery is unconfigured — nothing is lost.
 
 ---
 
+## Where your edits are stored (and how they reach the Pi)
+
+**Everything you change in edit mode is persisted immediately**, in exactly two
+places:
+
+- `data/site.db` (SQLite) — all structured content: games, sections, team
+  members, slides, press submissions, the featured-game choice, the site title,
+  the About mission, the **theme/palette/fonts**, and each game's **hero
+  crop/zoom + logo size/position**.
+- `media/` — every uploaded image/video original, plus generated `media/thumbs/`.
+
+Nothing lives only in the browser or in memory, and these two paths are **not**
+in git (they're git-ignored), so they travel with the data, not the code.
+
+### ⚠️ SQLite WAL note (important for copying)
+
+The DB runs in WAL mode, so recent writes live in `site.db-wal` until they're
+checkpointed into `site.db`. The app **checkpoints automatically on shutdown**,
+so after `systemctl stop 9up-games` (or Ctrl-C), `site.db` is complete and can
+be copied on its own. If you copy while the service is **running**, either use
+`scripts/backup.sh` (WAL-safe) or copy all three files together: `site.db`,
+`site.db-wal`, `site.db-shm`.
+
+### Moving content you authored locally onto the Pi
+
+If you've been editing on another machine and want that content on the Pi:
+
+1. Stop the app on the source machine (`Ctrl-C` / `systemctl stop`) so the DB
+   checkpoints.
+2. Copy `data/site.db` and the whole `media/` directory to the same locations
+   on the Pi (matching `DB_PATH` / `MEDIA_DIR`).
+3. Start the service on the Pi — your games, theme, media and layout appear.
+
+On a **fresh** Pi with no `data/`/`media/` copied over, the app just starts with
+the empty seed state, ready to edit via `/edit/<SECRET>`. Schema upgrades are
+applied automatically on boot (lightweight migrations), so an older `site.db`
+copied forward keeps working.
+
 ## Backups
 
 The entire site is **one SQLite file + the media directory**. To back up:
@@ -195,9 +233,7 @@ The entire site is **one SQLite file + the media directory**. To back up:
 
 This makes a consistent SQLite snapshot (`sqlite3 .backup`, safe while running
 in WAL mode) and a `tar.gz` of the media directory. To restore: copy the `.db`
-back to `DB_PATH` and extract the media tarball over `MEDIA_DIR`. For a manual
-backup, just copy `data/site.db*` and the `media/` directory while the service
-is stopped.
+back to `DB_PATH` and extract the media tarball over `MEDIA_DIR`.
 
 ---
 

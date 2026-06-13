@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS games (
   title       TEXT NOT NULL DEFAULT 'Untitled Game',
   slug        TEXT UNIQUE,
   hero_media  INTEGER REFERENCES media(id) ON DELETE SET NULL,
+  logo_media  INTEGER REFERENCES media(id) ON DELETE SET NULL,
+  display     TEXT NOT NULL DEFAULT '{}',
+  tagline     TEXT NOT NULL DEFAULT '',
   steam_url   TEXT NOT NULL DEFAULT '',
   position    INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT NOT NULL,
@@ -91,6 +94,19 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 `);
 
+// --- migrations -------------------------------------------------------------
+// Add columns that were introduced after the initial schema, for databases
+// created by earlier versions. CREATE TABLE IF NOT EXISTS won't add columns.
+function ensureColumn(table, column, definition) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+ensureColumn('games', 'logo_media', 'INTEGER REFERENCES media(id) ON DELETE SET NULL');
+ensureColumn('games', 'display', "TEXT NOT NULL DEFAULT '{}'");
+ensureColumn('games', 'tagline', "TEXT NOT NULL DEFAULT ''");
+
 // --- settings helpers -------------------------------------------------------
 const _getSetting = db.prepare('SELECT value FROM settings WHERE key = ?');
 const _setSetting = db.prepare(
@@ -108,6 +124,22 @@ export function setSetting(key, value) {
 
 export function nowISO() {
   return new Date().toISOString();
+}
+
+// Fold the write-ahead log back into the main DB file and close cleanly. Call
+// on shutdown so that after the service stops, `site.db` is complete on its own
+// (no -wal/-shm needed) — important so a backup/copy never misses recent edits.
+export function shutdownDb() {
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+  } catch (err) {
+    console.warn('[db] checkpoint on shutdown failed:', err.message);
+  }
+  try {
+    db.close();
+  } catch {
+    /* already closed */
+  }
 }
 
 // --- one-time seed so the first run has sensible empty states ---------------
