@@ -1,0 +1,26 @@
+[Unit]
+Description=9UP Games website
+After=network.target
+
+[Service]
+Type=simple
+# Adjust User/Group and WorkingDirectory to match your install.
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/9up-games
+# Loads /home/pi/9up-games/.env for EDIT_SECRET, email keys, paths, etc.
+EnvironmentFile=/home/pi/9up-games/.env
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=3
+
+# --- Hardening (the app only needs to read its code and write data/media) ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+# If you relocate DB_PATH / MEDIA_DIR outside WorkingDirectory, add them here:
+ReadWritePaths=/home/pi/9up-games/data /home/pi/9up-games/media
+
+[Install]
+WantedBy=multi-user.target
