@@ -97,12 +97,19 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
 /* Glass top bar — same treatment as the elevator-pitch box: transparent fill +
    backdrop blur, a 50% screen-blend top rim, and a button-coloured drop shadow. */
 .site-header {
-  position: sticky; top: 0; z-index: 30;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 30;
   background: transparent; backdrop-filter: blur(16px);
   box-shadow: 0 8px 24px -10px var(--btn-shadow);
   /* Glass + blur extend up under the status bar / notch; the inner .wrap sits
-     below the inset so the brand and menu stay clear of it. */
+     below the inset so the brand and menu stay clear of it. Fixed (not sticky)
+     so the hero can fill from the true top edge with no margin/env gymnastics. */
   padding-top: env(safe-area-inset-top);
+}
+/* Pages without a hero: offset their content below the fixed header. Hero pages
+   (home/game) deliberately let the hero run under the glass header. */
+body.page-games #main, body.page-about #main, body.page-press #main,
+body.page-admin #main, body.page-deck-edit #main {
+  padding-top: calc(var(--header-h) + env(safe-area-inset-top));
 }
 /* Bottom rim light that fades out toward the left/right edges. */
 .site-header::before {
@@ -226,18 +233,15 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
    art runs under it. Add the bar's height back to min-height so the bottom
    content sits at the same place it did before the pull-up. */
 #main > .hero:first-child {
-  margin-top: calc(-1 * var(--header-h));
+  /* Fixed header overlays the top, so the hero starts at the true top edge
+     (no negative margin needed); the extra header-h keeps the visible art
+     height the same as before. */
   min-height: calc(90vh + var(--header-h));
 }
 .hero--empty { background: linear-gradient(135deg, #20232e, #14161d); }
 /* Dedicated clip layer for the (zoomable) hero image, so the panel's drop
    shadow can still bleed past the hero into the next section. */
 .hero__bg { position: absolute; inset: 0; overflow: hidden; z-index: 0; }
-/* The top hero sits under the glass header; extend its art layer up into the
-   top safe-area inset (iOS notch/status bar) so the artwork — not flat
-   page-blue — fills that strip behind the glass. env() is 0 without a notch,
-   so this is a no-op on desktop/non-notch devices. */
-#main > .hero:first-child .hero__bg { top: calc(0px - env(safe-area-inset-top)); }
 /* Hero image: object-fit cover (always fills the frame). Parallax PANS through
    the image via object-position (so a tall image reveals its full height and
    the edge never shows), --focus-x/y = the tuned crop, --hero-zoom = zoom. */
@@ -749,7 +753,6 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
      art reveals its full height on a portrait screen; the per-game desktop zoom
      is neutralized so it reads zoomed-out. */
   .hero, #main > .hero:first-child {
-    margin-top: calc(-1 * var(--header-h));
     min-height: 100svh;
   }
   /* Frame the near-square key art for portrait: zoom in a touch and lift the
