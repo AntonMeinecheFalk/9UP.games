@@ -226,13 +226,18 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
    art runs under it. Add the bar's height back to min-height so the bottom
    content sits at the same place it did before the pull-up. */
 #main > .hero:first-child {
-  margin-top: calc(-1 * var(--header-h) - env(safe-area-inset-top));
+  margin-top: calc(-1 * var(--header-h));
   min-height: calc(90vh + var(--header-h));
 }
 .hero--empty { background: linear-gradient(135deg, #20232e, #14161d); }
 /* Dedicated clip layer for the (zoomable) hero image, so the panel's drop
    shadow can still bleed past the hero into the next section. */
 .hero__bg { position: absolute; inset: 0; overflow: hidden; z-index: 0; }
+/* The top hero sits under the glass header; extend its art layer up into the
+   top safe-area inset (iOS notch/status bar) so the artwork — not flat
+   page-blue — fills that strip behind the glass. env() is 0 without a notch,
+   so this is a no-op on desktop/non-notch devices. */
+#main > .hero:first-child .hero__bg { top: calc(0px - env(safe-area-inset-top)); }
 /* Hero image: object-fit cover (always fills the frame). Parallax PANS through
    the image via object-position (so a tall image reveals its full height and
    the edge never shows), --focus-x/y = the tuned crop, --hero-zoom = zoom. */
@@ -744,7 +749,7 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
      art reveals its full height on a portrait screen; the per-game desktop zoom
      is neutralized so it reads zoomed-out. */
   .hero, #main > .hero:first-child {
-    margin-top: calc(-1 * var(--header-h) - env(safe-area-inset-top));
+    margin-top: calc(-1 * var(--header-h));
     min-height: 100svh;
   }
   /* Frame the near-square key art for portrait: zoom in a touch and lift the

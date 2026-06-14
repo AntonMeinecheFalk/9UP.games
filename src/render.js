@@ -1,8 +1,11 @@
 // Server-side HTML rendering. Public output is read-only; when editMode is true
 // we add data-attributes and control bars that the client edit.js wires up.
 // All dynamic text is escaped; rich text is sanitized at save time.
+import fs from 'node:fs';
+import path from 'node:path';
 import { escapeHtml, safeUrl } from './sanitize.js';
 import { getMedia, mediaUrl, thumbUrl } from './media.js';
+import { ROOT } from './config.js';
 import {
   Site,
   DEFAULT_THEME,
@@ -78,6 +81,19 @@ function googleFontsLink(theme) {
   );
 }
 
+// Append a content-version query (?v=<mtime>) to a static asset URL so browsers
+// and the Cloudflare edge fetch the new file immediately after a deploy, instead
+// of serving a stale cached copy. Falls back to the bare URL if the file is
+// missing. `rel` is relative to the public/ dir, e.g. 'css/styles.css'.
+function assetUrl(rel) {
+  try {
+    const mtime = fs.statSync(path.join(ROOT, 'public', rel)).mtimeMs;
+    return `/${rel}?v=${Math.floor(mtime).toString(36)}`;
+  } catch {
+    return `/${rel}`;
+  }
+}
+
 // --- page shell -------------------------------------------------------------
 export function layout({ title, body, editMode, extraHead = '', bodyClass = '' }) {
   const siteTitle = escapeHtml(Site.title());
@@ -91,7 +107,7 @@ export function layout({ title, body, editMode, extraHead = '', bodyClass = '' }
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${pageTitle}</title>
 ${googleFontsLink(theme)}
-<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="${assetUrl('css/styles.css')}">
 ${themeStyle(theme)}
 ${extraHead}
 </head>
@@ -138,8 +154,8 @@ ${extraHead}
   </div>
 </footer>
 ${editMode ? themePanel(theme) : ''}
-<script src="/js/app.js" defer></script>
-${editMode ? '<script src="/js/edit.js" defer></script>' : ''}
+<script src="${assetUrl('js/app.js')}" defer></script>
+${editMode ? `<script src="${assetUrl('js/edit.js')}" defer></script>` : ''}
 </body>
 </html>`;
 }
