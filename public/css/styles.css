@@ -111,18 +111,6 @@ body.page-games #main, body.page-about #main, body.page-press #main,
 body.page-admin #main, body.page-deck-edit #main {
   padding-top: calc(var(--header-h) + env(safe-area-inset-top));
 }
-/* Portrait phones in a browser tab: iOS paints the status-bar strip a solid
-   --bg (can't render content there in a tab). Start the header's top as that
-   same --bg and fade it into the glass so the strip blends smoothly instead of
-   showing a hard seam. The multiply darkening (::after) is held off this top
-   strip so the blended colour stays true to the page background. Excluded in
-   standalone (Add to Home Screen), where the art bleeds up instead. */
-@media (max-width: 820px) and (orientation: portrait) and (display-mode: browser) {
-  /* Same tone as the theme-color status bar (#2f93cf) so the strip + header are
-     one continuous bar, fading into the glass below. */
-  .site-header { background: linear-gradient(to bottom, #2f93cf 0, transparent 2.5rem); }
-  .site-header::after { top: 1.5rem; }
-}
 /* Bottom rim light that fades out toward the left/right edges. */
 .site-header::before {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none;

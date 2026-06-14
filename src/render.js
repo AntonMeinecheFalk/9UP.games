@@ -106,10 +106,10 @@ export function layout({ title, body, editMode, extraHead = '', bodyClass = '' }
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${pageTitle}</title>
-<!-- Colour the iOS Safari (tab) status bar to the header's glass tone so the
-     status-bar strip and the header read as one continuous bar (see the matching
-     gradient on .site-header). -->
-<meta name="theme-color" content="#2f93cf">
+<!-- Colour the iOS Safari status bar to the header's glass tone (sampled from the
+     target mockup) so the status-bar strip and the header read as one continuous
+     bar in a tab. -->
+<meta name="theme-color" content="#4990ab">
 <!-- Added to Home Screen: run fullscreen with a translucent status bar so the
      hero art bleeds up behind it (the top inset iOS only exposes in standalone). -->
 <meta name="apple-mobile-web-app-capable" content="yes">
