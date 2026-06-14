@@ -124,6 +124,7 @@ ${extraHead}
 <body class="${bodyClass}${editMode ? ' is-edit' : ''}">
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site-header">
+  <div class="site-header__glass" aria-hidden="true"></div>
   <div class="wrap">
     <div class="brand-group">
       <a class="brand" href="/">

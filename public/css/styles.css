@@ -98,7 +98,7 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
    backdrop blur, a 50% screen-blend top rim, and a button-coloured drop shadow. */
 .site-header {
   position: fixed; top: 0; left: 0; right: 0; z-index: 30;
-  background: transparent; backdrop-filter: blur(16px);
+  background: transparent;
   box-shadow: 0 8px 24px -10px var(--btn-shadow);
   /* Glass + blur extend up under the status bar / notch; the inner .wrap sits
      below the inset so the brand and menu stay clear of it. Fixed (not sticky)
@@ -110,6 +110,13 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
 body.page-games #main, body.page-about #main, body.page-press #main,
 body.page-admin #main, body.page-deck-edit #main {
   padding-top: calc(var(--header-h) + env(safe-area-inset-top));
+}
+/* The glass blur lives on a dedicated behind-content layer (not on .site-header
+   itself) so the header isn't a "backdrop root" — that lets the hamburger
+   dropdown, which is a descendant, run its OWN backdrop blur of the page. */
+.site-header__glass {
+  position: absolute; inset: 0; z-index: -2; pointer-events: none;
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
 }
 /* Bottom rim light that fades out toward the left/right edges. */
 .site-header::before {
@@ -746,7 +753,8 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
     /* Frosted like the pitch box, with a subtle dark tint so the menu stays
        readable over the bright top-of-hero art (the pitch box gets that contrast
        for free by sitting over darker art). */
-    background: rgba(13, 48, 74, 0.42); backdrop-filter: blur(16px);
+    background: rgba(13, 48, 74, 0.42);
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
     border-radius: 28px;
     box-shadow: 0 20px 50px -10px var(--btn-shadow);
     /* Collapsed by default; .is-open (set by app.js) reveals it. */
