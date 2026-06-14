@@ -10,6 +10,18 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1); // safe behind nginx/caddy; needed for Secure cookies
 
+// Force HTTPS when behind the TLS-terminating proxy (the Cloudflare tunnel sets
+// X-Forwarded-Proto to the visitor's scheme). Plain-HTTP visitors get a 301 to
+// HTTPS. Direct local requests carry no XFP header and are left alone, so
+// localhost health checks (127.0.0.1:3000) keep working.
+app.use((req, res, next) => {
+  const xfp = req.headers['x-forwarded-proto'];
+  if (xfp && xfp !== 'https') {
+    return res.redirect(301, 'https://' + req.headers.host + req.originalUrl);
+  }
+  next();
+});
+
 // Body parsers (JSON for the edit API; urlencoded for the press form fallback).
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
