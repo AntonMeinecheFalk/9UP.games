@@ -88,7 +88,7 @@ export function layout({ title, body, editMode, extraHead = '', bodyClass = '' }
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${pageTitle}</title>
 ${googleFontsLink(theme)}
 <link rel="stylesheet" href="/css/styles.css">

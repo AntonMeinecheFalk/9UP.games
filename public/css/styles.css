@@ -77,7 +77,13 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
-.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 1.25rem; }
+/* Horizontal padding grows by the safe-area insets so content clears the notch
+   in landscape; env() is 0 on devices without insets, so desktop is unchanged. */
+.wrap {
+  max-width: var(--wrap); margin: 0 auto;
+  padding-left: calc(1.25rem + env(safe-area-inset-left));
+  padding-right: calc(1.25rem + env(safe-area-inset-right));
+}
 .muted { color: var(--fg-muted); }
 .lede { font-size: 1.15rem; color: var(--fg-muted); }
 
@@ -94,6 +100,9 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
   position: sticky; top: 0; z-index: 30;
   background: transparent; backdrop-filter: blur(16px);
   box-shadow: 0 8px 24px -10px var(--btn-shadow);
+  /* Glass + blur extend up under the status bar / notch; the inner .wrap sits
+     below the inset so the brand and menu stay clear of it. */
+  padding-top: env(safe-area-inset-top);
 }
 /* Bottom rim light that fades out toward the left/right edges. */
 .site-header::before {
@@ -144,7 +153,7 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
 .nav-toggle[aria-expanded="true"] .nav-toggle__bars { background: transparent; }
 .nav-toggle[aria-expanded="true"] .nav-toggle__bars::before { transform: translateY(8px) rotate(45deg); }
 .nav-toggle[aria-expanded="true"] .nav-toggle__bars::after { transform: translateY(-8px) rotate(-45deg); }
-.site-footer { border-top: 1px solid var(--border); margin-top: 4rem; padding: 2rem 0; color: var(--fg-muted); }
+.site-footer { border-top: 1px solid var(--border); margin-top: 4rem; padding: 2rem 0 calc(2rem + env(safe-area-inset-bottom)); color: var(--fg-muted); }
 .site-footer .wrap { display: flex; justify-content: space-between; }
 
 /* --- buttons (unified, "juicy") -------------------------------------------
@@ -217,7 +226,7 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
    art runs under it. Add the bar's height back to min-height so the bottom
    content sits at the same place it did before the pull-up. */
 #main > .hero:first-child {
-  margin-top: calc(-1 * var(--header-h));
+  margin-top: calc(-1 * (var(--header-h) + env(safe-area-inset-top)));
   min-height: calc(90vh + var(--header-h));
 }
 .hero--empty { background: linear-gradient(135deg, #20232e, #14161d); }
@@ -326,7 +335,7 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
 /* Edit controls float as a tidy rounded card over the top-left of the hero,
    instead of a full-width bar that distorts the layout. */
 .hero__tools {
-  position: absolute; top: calc(var(--header-h) + 1rem); left: 1rem; z-index: 3;
+  position: absolute; top: calc(var(--header-h) + env(safe-area-inset-top) + 1rem); left: 1rem; z-index: 3;
   width: min(580px, calc(100% - 2rem));
   display: flex; flex-direction: column; gap: 0.6rem;
 }
@@ -735,7 +744,7 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
      art reveals its full height on a portrait screen; the per-game desktop zoom
      is neutralized so it reads zoomed-out. */
   .hero, #main > .hero:first-child {
-    margin-top: calc(-1 * var(--header-h));
+    margin-top: calc(-1 * (var(--header-h) + env(safe-area-inset-top)));
     min-height: 100svh;
   }
   /* Frame the near-square key art for portrait: zoom in a touch and lift the
