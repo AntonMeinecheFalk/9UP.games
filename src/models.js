@@ -7,6 +7,11 @@ import { db, nowISO, getSetting, setSetting } from './db.js';
 export const DEFAULT_DISPLAY = {
   heroPosX: 50, heroPosY: 50, heroZoom: 100, // % (object-position + scale)
   logoScale: 100, logoX: 0, logoY: 0,        // % size, px offsets
+  // Mobile (portrait) hero-art framing — a separate set of controls, since the
+  // near-square key art needs a different zoom/pan than the wide desktop crop.
+  // mHeroZoom = % scale; mHeroX = object-position % (pans within the image, no
+  // gap); mHeroY = % vertical translate (clamped to the zoom's overflow in CSS).
+  mHeroZoom: 140, mHeroX: 50, mHeroY: -10,
 };
 export function parseDisplay(raw) {
   let d = {};
@@ -26,6 +31,9 @@ export function parseDisplay(raw) {
     logoScale: clamp(d.logoScale, 20, 400, 100),
     logoX: clamp(d.logoX, -600, 600, 0),
     logoY: clamp(d.logoY, -600, 600, 0),
+    mHeroZoom: clamp(d.mHeroZoom, 100, 300, 140),
+    mHeroX: clamp(d.mHeroX, 0, 100, 50),
+    mHeroY: clamp(d.mHeroY, -100, 100, -10),
   };
 }
 

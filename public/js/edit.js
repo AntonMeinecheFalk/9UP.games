@@ -502,11 +502,18 @@
       media.style.setProperty('--focus-x', (v.heroPosX ?? 50) + '%');
       media.style.setProperty('--focus-y', (v.heroPosY ?? 50) + '%');
       media.style.setProperty('--hero-zoom', (v.heroZoom ?? 100) / 100);
+      // Mobile framing vars (only consumed by the ≤820px hero rules).
+      media.style.setProperty('--m-hero-zoom', (v.mHeroZoom ?? 140) / 100);
+      media.style.setProperty('--m-hero-x', (v.mHeroX ?? 50) + '%');
+      media.style.setProperty('--m-hero-y', (v.mHeroY ?? -10) + '%');
       window.dispatchEvent(new Event('resize')); // re-base the parallax pan
     }
     const logo = hero.querySelector('.hero__logo');
     if (logo) {
       logo.style.transform = `translate(${v.logoX || 0}px, calc(-50% + ${v.logoY || 0}px)) scale(${(v.logoScale ?? 100) / 100})`;
+      // Vars used by the mobile (centered) logo rule.
+      logo.style.setProperty('--logo-scale', (v.logoScale ?? 100) / 100);
+      logo.style.setProperty('--logo-y', (v.logoY || 0) + 'px');
     }
     clearTimeout(heroSaveTimer);
     heroSaveTimer = setTimeout(async () => {

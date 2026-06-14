@@ -113,7 +113,10 @@ ${extraHead}
           : ''
       }
     </div>
-    <nav class="site-nav" aria-label="Primary">
+    <button type="button" class="nav-toggle" data-nav-toggle aria-label="Menu" aria-expanded="false" aria-controls="site-nav">
+      <span class="nav-toggle__bars" aria-hidden="true"></span>
+    </button>
+    <nav class="site-nav" id="site-nav" aria-label="Primary">
       <a href="/">Home</a>
       <a href="/games">Games</a>
       <a href="/about">About</a>
@@ -190,8 +193,12 @@ export function renderHero(game, editMode) {
   // Hero image is a real <img> (object-fit: cover) so object-position controls
   // crop/focus and a scale transform controls zoom.
   const heroImg = hero
-    ? `<div class="hero__bg"><img class="hero__media" src="${escapeHtml(mediaUrl(hero))}" alt="" aria-hidden="true"
-         style="--focus-x:${d.heroPosX}%;--focus-y:${d.heroPosY}%;--hero-zoom:${d.heroZoom / 100}"></div>`
+    ? `<div class="hero__bg" style="--hero-url:url('${escapeHtml(mediaUrl(hero))}')"><img class="hero__media" src="${escapeHtml(
+        mediaUrl(hero)
+      )}" alt="" aria-hidden="true"
+         style="--focus-x:${d.heroPosX}%;--focus-y:${d.heroPosY}%;--hero-zoom:${d.heroZoom / 100};--m-hero-zoom:${
+        d.mHeroZoom / 100
+      };--m-hero-x:${d.mHeroX}%;--m-hero-y:${d.mHeroY}%"></div>`
     : '';
 
   // When a logo exists, it IS the visual title; the text <h1> is kept only for
@@ -200,7 +207,7 @@ export function renderHero(game, editMode) {
   const titleClass = logo ? 'hero__title sr-only' : 'hero__title';
   const logoHtml = logo
     ? `<img class="hero__logo" src="${escapeHtml(mediaUrl(logo))}" alt="${escapeHtml(game.title)}"
-         style="transform:translate(${d.logoX}px, calc(-50% + ${d.logoY}px)) scale(${d.logoScale / 100})">`
+         style="--logo-scale:${d.logoScale / 100};--logo-y:${d.logoY}px;transform:translate(${d.logoX}px, calc(-50% + ${d.logoY}px)) scale(${d.logoScale / 100})">`
     : '';
 
   // Each control: a coarse slider, plus a "fine" slider (hidden until precision
@@ -275,10 +282,15 @@ export function renderHero(game, editMode) {
              <label class="hero-adjust__precision"><input type="checkbox" data-hero-precision> Precision mode (fine nudge)</label>
              ${
                hero
-                 ? `<div class="hero-adjust__group"><strong>Hero image</strong>
+                 ? `<div class="hero-adjust__group"><strong>Hero image — desktop</strong>
                       ${range('heroPosX', 'Focus ←→', 0, 100)}
                       ${range('heroPosY', 'Focus ↑↓', 0, 100)}
                       ${range('heroZoom', 'Zoom', 100, 300)}
+                    </div>
+                    <div class="hero-adjust__group"><strong>Hero image — mobile</strong>
+                      ${range('mHeroZoom', 'Zoom', 100, 300)}
+                      ${range('mHeroX', 'Pan ←→', 0, 100)}
+                      ${range('mHeroY', 'Pan ↑↓', -100, 100)}
                     </div>`
                  : '<p class="muted">Add a hero image to adjust its crop.</p>'
              }

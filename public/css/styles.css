@@ -125,6 +125,25 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
   padding: 0.3rem 0.8rem; font-size: 0.85rem; text-shadow: none;
 }
 .nav-exit { color: var(--accent-2); }
+/* Hamburger toggle — hidden on desktop, shown in the compact (vertical) layout.
+   Three bars drawn from one span (center bar) + its ::before/::after. */
+.nav-toggle {
+  display: none; position: relative; z-index: 2;
+  width: 44px; height: 44px; padding: 0; border: none; cursor: pointer;
+  background: transparent; color: var(--fg);
+}
+.nav-toggle__bars, .nav-toggle__bars::before, .nav-toggle__bars::after {
+  content: ""; position: absolute; left: 50%; width: 26px; height: 3px; margin-left: -13px;
+  border-radius: 3px; background: currentColor; filter: drop-shadow(var(--text-shadow));
+  transition: transform 0.25s ease, opacity 0.2s ease;
+}
+.nav-toggle__bars { top: 50%; margin-top: -1.5px; }
+.nav-toggle__bars::before { top: -8px; }
+.nav-toggle__bars::after { top: 8px; }
+/* Animate into an "X" when the menu is open. */
+.nav-toggle[aria-expanded="true"] .nav-toggle__bars { background: transparent; }
+.nav-toggle[aria-expanded="true"] .nav-toggle__bars::before { transform: translateY(8px) rotate(45deg); }
+.nav-toggle[aria-expanded="true"] .nav-toggle__bars::after { transform: translateY(-8px) rotate(-45deg); }
 .site-footer { border-top: 1px solid var(--border); margin-top: 4rem; padding: 2rem 0; color: var(--fg-muted); }
 .site-footer .wrap { display: flex; justify-content: space-between; }
 
@@ -693,14 +712,90 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 .theme-panel__reset { width: 100%; margin-top: 0.85rem; }
 
 /* --- responsive --- */
+/* Compact / vertical layout: collapse the nav into a hamburger, stack the hero
+   panel over the (full-bleed, zoomed-out) art, and turn the divider horizontal. */
 @media (max-width: 820px) {
-  .hero__panel { flex-direction: column; gap: 1.25rem; padding: 1.25rem 1.5rem; }
-  .hero__panel-left { max-width: none; }
-  .hero__pitch { align-self: stretch; font-size: 1.05rem; }
-  .hero__pitch::before { display: none; } /* divider only makes sense side-by-side */
+  /* Nav collapses into a dropdown toggled by the hamburger. */
+  .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .site-nav {
+    position: absolute; top: 100%; right: 0; left: 0;
+    flex-direction: column; align-items: stretch;
+    padding: 0.5rem 0;
+    background: rgba(var(--bg-rgb), 0.92); backdrop-filter: blur(16px);
+    box-shadow: 0 12px 24px -10px var(--btn-shadow);
+    border-bottom: 1px solid var(--border);
+    /* Collapsed by default; .is-open (set by app.js) reveals it. */
+    display: none;
+  }
+  .site-nav.is-open { display: flex; }
+  .site-nav a { margin-left: 0; padding: 0.75rem 1.5rem; }
+
+  /* Hero keeps the art FULL-BLEED behind a translucent panel (so the art shows
+     through and bleeds down behind it, as in the concept). The near-square key
+     art reveals its full height on a portrait screen; the per-game desktop zoom
+     is neutralized so it reads zoomed-out. */
+  .hero, #main > .hero:first-child {
+    margin-top: calc(-1 * var(--header-h));
+    min-height: 100svh;
+  }
+  /* Frame the near-square key art for portrait: zoom in a touch and lift the
+     focal character up out of the panel/logo zone (object-position can't crop a
+     square image inside a portrait box, so the framing is done with transform).
+     Resolution-independent — the %s hold across phone sizes. */
+  /* Horizontal framing pans WITHIN the source via object-position (never gaps).
+     Vertical framing uses translateY and is free to pan past the image edge —
+     any space that opens up is filled by the edge-extension layers below. */
+  .hero__media {
+    z-index: 1;
+    object-position: var(--m-hero-x, 50%) 50% !important;
+    transform: translateY(calc(var(--m-hero-y, -10%) + var(--m-parallax-y, 0%))) scale(var(--m-hero-zoom, 1.4)) !important;
+  }
+  /* Edge extension: repeat the top/bottom edge pixels of the key art outward so
+     panning the hero vertically never reveals a gap. Each half shows only the
+     nearest edge row (huge background-size), stretched to fill — the sky (top)
+     and grass (bottom) are near-uniform, so the seam is invisible. The panned
+     image sits above (z-index:1); these show through wherever it doesn't reach. */
+  .hero__bg::before, .hero__bg::after {
+    content: ""; position: absolute; left: 0; right: 0; z-index: 0;
+    background-image: var(--hero-url); background-repeat: no-repeat;
+    /* Soft horizontal blur turns the stretched edge row into a smooth wash of
+       the edge colours (avoids hard vertical stripes from non-uniform edges).
+       transform:scale pushes the blur's own fade-out past the box border. */
+    filter: blur(28px); transform: scale(1.4); pointer-events: none;
+  }
+  .hero__bg::before { top: 0; height: 50%; background-position: center top; background-size: 100% 100000%; transform-origin: center top; }
+  .hero__bg::after { bottom: 0; height: 50%; background-position: center bottom; background-size: 100% 100000%; transform-origin: center bottom; }
+  /* Logo is always horizontally centered on the box (regardless of width, so it
+     reads well on wide/foldable screens). Per-game size + vertical offset kept. */
+  .hero__logo {
+    left: 50% !important; transform-origin: center center !important;
+    transform: translate(-50%, calc(-50% + var(--logo-y, 0px))) scale(var(--logo-scale, 1)) !important;
+  }
+  .hero__overlay { padding: 3rem 0 2rem; }
+  /* Panel hugs its content vertically; children stay full-width so the buttons
+     keep a single centered row. */
+  .hero__panel { flex-direction: column; align-items: stretch; gap: 1.25rem; padding: 1.5rem; }
+  .hero__panel-left { max-width: none; align-items: stretch; }
+  /* Keep both CTAs on one centered row even on narrow phones. */
+  .hero__buttons { justify-content: center; flex-wrap: nowrap; gap: 0.75rem; }
+  .hero__buttons .btn { padding-left: 1.1rem; padding-right: 1.1rem; }
+
+  /* Pitch sits below the buttons with a HORIZONTAL divider above it (rather than
+     the side-by-side vertical rule). flex:0 0 auto so the box hugs the text
+     instead of inheriting the desktop 320px basis. Text is centered. */
+  .hero__pitch {
+    align-self: stretch; flex: 0 0 auto;
+    align-items: stretch; justify-content: flex-start; text-align: center;
+    font-size: 0.89rem; padding-top: 1.25rem;
+  }
+  .hero__pitch .prose p, .hero__pitch.prose p { max-width: none; }
+  .hero__pitch::before {
+    left: 0; right: 0; top: 0; bottom: auto;
+    width: auto; height: 2px;
+    background: linear-gradient(to right, var(--btn-highlight) 0%, transparent 80%);
+  }
 }
 @media (max-width: 640px) {
   .theme-panel { width: calc(100vw - 2.5rem); }
   .site-footer .wrap { flex-direction: column; gap: 0.5rem; }
-  .hero { min-height: 60vh; }
 }

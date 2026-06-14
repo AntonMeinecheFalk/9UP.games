@@ -19,6 +19,24 @@
     if (next) next.addEventListener('click', () => show(i + 1));
   });
 
+  // --- Mobile nav (hamburger) toggle ----------------------------------------
+  (function navToggle() {
+    const btn = document.querySelector('[data-nav-toggle]');
+    const nav = document.getElementById('site-nav');
+    if (!btn || !nav) return;
+    const setOpen = (open) => {
+      nav.classList.toggle('is-open', open);
+      btn.setAttribute('aria-expanded', String(open));
+    };
+    btn.addEventListener('click', () => setOpen(!nav.classList.contains('is-open')));
+    // Close after navigating, and on outside click / Escape.
+    nav.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => setOpen(false)));
+    document.addEventListener('click', (e) => {
+      if (nav.classList.contains('is-open') && !nav.contains(e.target) && !btn.contains(e.target)) setOpen(false);
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+  })();
+
   // --- Custom scroll-position indicator (replaces the hidden native bar) -----
   (function scrollIndicator() {
     const el = document.createElement('div');
@@ -82,26 +100,34 @@
     if (!media) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const hero = media.closest('.hero');
-    let goal = 50;
-    let current = 50;
+    let base = 50, maxPan = 0; // refreshed from CSS each recompute
+    let goalProg = 0, current = 0; // scroll progress 0→1 (smoothed via `current`)
     let raf = null;
 
-    // Parallax pans object-position-Y from the focus point downward as the hero
-    // scrolls out. Clamped to 0–100% so cover always fills (never a gap/edge).
+    // `progress` = 0 when the hero top is at the viewport top, 1 when fully
+    // scrolled past. Desktop pans object-position-Y from the focus point
+    // downward; mobile (where object-position-Y can't move a tall crop) shifts
+    // the art via a translateY offset instead. Same scroll-driven amount.
     function recompute() {
       const cs = getComputedStyle(media);
-      const focusY = parseFloat(cs.getPropertyValue('--focus-y')) || 50;
-      const maxPan = parseFloat(cs.getPropertyValue('--hero-parallax-max')) || 0;
+      base = parseFloat(cs.getPropertyValue('--focus-y')) || 50;
+      maxPan = parseFloat(cs.getPropertyValue('--hero-parallax-max')) || 0;
       const h = hero.offsetHeight || 1;
-      // 0 when the hero top is at the viewport top, 1 when fully scrolled past.
-      const progress = Math.max(0, Math.min(1, -hero.getBoundingClientRect().top / h));
-      goal = Math.max(0, Math.min(100, focusY + progress * maxPan));
+      goalProg = Math.max(0, Math.min(1, -hero.getBoundingClientRect().top / h));
+    }
+    function apply() {
+      // Desktop: object-position-Y from the focus point, clamped so cover fills.
+      const pos = Math.max(0, Math.min(100, base + current * maxPan));
+      media.style.setProperty('--parallax-pos', pos.toFixed(2) + '%');
+      // Mobile: translateY offset (added to the framing translate). No clamp —
+      // any exposed edge is filled by the hero edge-extension layers.
+      media.style.setProperty('--m-parallax-y', (current * maxPan).toFixed(2) + '%');
     }
     function tick() {
-      current += (goal - current) * 0.12; // lerp toward goal
-      if (Math.abs(goal - current) < 0.05) current = goal;
-      media.style.setProperty('--parallax-pos', current.toFixed(2) + '%');
-      raf = current === goal ? null : requestAnimationFrame(tick);
+      current += (goalProg - current) * 0.12; // lerp toward goal
+      if (Math.abs(goalProg - current) < 0.0005) current = goalProg;
+      apply();
+      raf = current === goalProg ? null : requestAnimationFrame(tick);
     }
     function onScroll() {
       recompute();
@@ -110,8 +136,8 @@
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     recompute();
-    current = goal;
-    media.style.setProperty('--parallax-pos', current.toFixed(2) + '%');
+    current = goalProg;
+    apply();
   })();
 
   // --- Games catalogue carousel (animated swipe) ----------------------------
