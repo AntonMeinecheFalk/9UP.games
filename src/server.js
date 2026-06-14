@@ -19,6 +19,11 @@ app.use((req, res, next) => {
   if (xfp && xfp !== 'https') {
     return res.redirect(301, 'https://' + req.headers.host + req.originalUrl);
   }
+  // HSTS: tell browsers to always use HTTPS for this host going forward (only
+  // honored when delivered over HTTPS). Clears the "Not secure" stickiness that
+  // earlier plain-HTTP/cert-error visits leave behind. No includeSubDomains so
+  // it can't affect mail/other subdomains. 1 year.
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000');
   next();
 });
 
