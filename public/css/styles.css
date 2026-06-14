@@ -735,18 +735,37 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 @media (max-width: 820px) {
   /* Nav collapses into a dropdown toggled by the hamburger. */
   .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  /* Frosted, rounded card matching the elevator-pitch box — but with the
+     screen-blend rim light on the BOTTOM edge instead of the top. */
   .site-nav {
-    position: absolute; top: 100%; right: 0; left: 0;
+    position: absolute; top: calc(100% + 0.4rem);
+    left: calc(0.75rem + env(safe-area-inset-left));
+    right: calc(0.75rem + env(safe-area-inset-right));
     flex-direction: column; align-items: stretch;
-    padding: 0.5rem 0;
-    background: rgba(var(--bg-rgb), 0.92); backdrop-filter: blur(16px);
-    box-shadow: 0 12px 24px -10px var(--btn-shadow);
-    border-bottom: 1px solid var(--border);
+    padding: 0.4rem 0;
+    /* Frosted like the pitch box, with a subtle dark tint so the menu stays
+       readable over the bright top-of-hero art (the pitch box gets that contrast
+       for free by sitting over darker art). */
+    background: rgba(13, 48, 74, 0.42); backdrop-filter: blur(16px);
+    border-radius: 28px;
+    box-shadow: 0 20px 50px -10px var(--btn-shadow);
     /* Collapsed by default; .is-open (set by app.js) reveals it. */
     display: none;
   }
   .site-nav.is-open { display: flex; }
-  .site-nav a { margin-left: 0; padding: 0.75rem 1.5rem; }
+  .site-nav a { text-shadow: var(--text-shadow-strong); }
+  .site-nav::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    border-bottom: 2px solid var(--btn-highlight);
+    mix-blend-mode: screen; pointer-events: none; opacity: 0.5;
+  }
+  .site-nav a { margin-left: 0; padding: 0.85rem 1.5rem; position: relative; }
+  /* Divider between each option, fading out toward both ends. */
+  .site-nav a:not(:last-child)::after {
+    content: ""; position: absolute; left: 1.25rem; right: 1.25rem; bottom: 0; height: 2px;
+    background: linear-gradient(to right, transparent, var(--btn-highlight), transparent);
+    mix-blend-mode: screen; pointer-events: none; opacity: 0.5;
+  }
 
   /* Hero keeps the art FULL-BLEED behind a translucent panel (so the art shows
      through and bleeds down behind it, as in the concept). The near-square key
@@ -809,7 +828,8 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   .hero__pitch::before {
     left: 0; right: 0; top: 0; bottom: auto;
     width: auto; height: 2px;
-    background: linear-gradient(to right, var(--btn-highlight) 0%, transparent 80%);
+    /* Horizontal divider fades out toward BOTH ends. */
+    background: linear-gradient(to right, transparent, var(--btn-highlight), transparent);
   }
 }
 @media (max-width: 640px) {
