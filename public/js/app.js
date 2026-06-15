@@ -60,11 +60,13 @@
       wave.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:${R}px`;
       fxLayer().appendChild(wave);
       const anim = wave.animate(
+        // Stays fully opaque the whole way — it fades out purely by the line
+        // thinning to nothing (border-width 3px → 0), not by going transparent.
         [
           { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
-            borderRadius: `${R}px`, borderWidth: '3px', opacity: 0.85 },
+            borderRadius: `${R}px`, borderWidth: '3px' },
           { left: `${r.left - d}px`, top: `${r.top - d}px`, width: `${r.width + 2 * d}px`, height: `${r.height + 2 * d}px`,
-            borderRadius: `${R + d}px`, borderWidth: '0px', opacity: 0 },
+            borderRadius: `${R + d}px`, borderWidth: '0px' },
         ],
         { duration: 550, easing: 'cubic-bezier(0.2, 0.6, 0.35, 1)' }
       );
