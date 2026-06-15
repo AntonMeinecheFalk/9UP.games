@@ -2,6 +2,41 @@
 (function () {
   'use strict';
 
+  // --- Click feedback: bounce + shape-matched shockwave on every button -----
+  (function clickFeedback() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const SELECTOR = 'button, a.btn';
+    let layer = null;
+    const fxLayer = () => (layer || (layer = document.body.appendChild(
+      Object.assign(document.createElement('div'), { className: 'fx-layer' })
+    )));
+    document.addEventListener('pointerdown', (e) => {
+      if (e.button != null && e.button !== 0) return; // primary button only
+      const btn = e.target.closest(SELECTOR);
+      if (!btn || btn.disabled) return;
+      // Press bounce: scale down → overshoot → settle. Animating the `scale`
+      // property (not `transform`) lets it compose with each button's existing
+      // transform-based hover/float instead of overriding it.
+      btn.animate(
+        [
+          { scale: '1' }, { scale: '0.85', offset: 0.2 }, { scale: '1.08', offset: 0.45 },
+          { scale: '0.97', offset: 0.65 }, { scale: '1.02', offset: 0.82 }, { scale: '1' },
+        ],
+        { duration: 460, easing: 'ease-out' }
+      );
+      // Shockwave: a ring the size + shape (border-radius) of the button.
+      const r = btn.getBoundingClientRect();
+      if (!r.width) return;
+      const wave = document.createElement('span');
+      wave.className = 'shockwave';
+      wave.style.cssText =
+        `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;` +
+        `border-radius:${getComputedStyle(btn).borderRadius}`;
+      fxLayer().appendChild(wave);
+      wave.addEventListener('animationend', () => wave.remove());
+    });
+  })();
+
   // --- Image carousels ------------------------------------------------------
   document.querySelectorAll('[data-carousel]').forEach((root) => {
     const slides = Array.from(root.querySelectorAll('.carousel__slide'));

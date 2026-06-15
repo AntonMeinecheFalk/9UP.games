@@ -49,6 +49,10 @@ A wrong secret returns a plain 404.
   out of a white disc (the `--arrow-hole` mask). Size via `--arrow-size`/`--tri-size`, direction via
   `--prev`/`--next`. Markup adds `glass-arrow glass-arrow--prev/next` + a context class for position
   (`carousel__prev/next`, `deck-arrow`). The triangle SVG comes from `triSvg()` exported by `render.js`.
+- **Click feedback** (`app.js` → `clickFeedback`): a global `pointerdown` handler on `button, a.btn`
+  plays a press bounce (Web-Animations on the `scale` property, so it composes with hover/float
+  transforms) and spawns a `.shockwave` ring into a `.fx-layer` overlay, sized to the button and given
+  its computed `border-radius` (so circles ring as circles, pills as pills). Respects reduced-motion.
 - **Per-game hero framing** is stored in each game's `display` JSON (`parseDisplay`), with
   **separate desktop and mobile controls** (edit mode → "Adjust hero & logo"):
   - Desktop: `heroPosX/heroPosY` (object-position focus), `heroZoom`.
