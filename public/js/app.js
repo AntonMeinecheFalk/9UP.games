@@ -1,10 +1,22 @@
-// Public, read-only behaviors: image carousels and the press-kit request flow.
+// Public, read-only behaviors (carousels, parallax, press flow, click feedback)
+// plus a soft "persistent-header" navigation: clicking a header/brand link swaps
+// only <main> instead of doing a full page load, so the header — and any
+// animation playing on it (the click bounce + shockwave) — survives the
+// navigation instead of being torn down mid-flight.
 (function () {
   'use strict';
 
+  const reduceMotion =
+    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ======================================================================
+  // GLOBAL widgets — wired once. These live on the header or <body>, which
+  // soft-nav never replaces, so they must NOT be re-initialised per page.
+  // ======================================================================
+
   // --- Click feedback: bounce + shape-matched shockwave on every button -----
   (function clickFeedback() {
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reduceMotion) return;
     const SELECTOR = 'button, a.btn, .site-nav a, .brand';
     let layer = null;
     const fxLayer = () => (layer || (layer = document.body.appendChild(
@@ -24,7 +36,8 @@
         ],
         { duration: 460, easing: 'ease-out' }
       );
-      // Shockwave: a ring the size + shape (border-radius) of the button.
+      // Shockwave: a ring the size + shape (border-radius) of the button. Lives
+      // in the body-level .fx-layer, so a soft-nav content swap can't cut it off.
       const r = btn.getBoundingClientRect();
       if (!r.width) return;
       const wave = document.createElement('span');
@@ -36,23 +49,6 @@
       wave.addEventListener('animationend', () => wave.remove());
     });
   })();
-
-  // --- Image carousels ------------------------------------------------------
-  document.querySelectorAll('[data-carousel]').forEach((root) => {
-    const slides = Array.from(root.querySelectorAll('.carousel__slide'));
-    if (slides.length <= 1) return;
-    let i = slides.findIndex((s) => s.classList.contains('is-active'));
-    if (i < 0) i = 0;
-    const show = (n) => {
-      slides[i].classList.remove('is-active');
-      i = (n + slides.length) % slides.length;
-      slides[i].classList.add('is-active');
-    };
-    const prev = root.querySelector('.carousel__prev');
-    const next = root.querySelector('.carousel__next');
-    if (prev) prev.addEventListener('click', () => show(i - 1));
-    if (next) next.addEventListener('click', () => show(i + 1));
-  });
 
   // --- Mobile nav (hamburger) toggle ----------------------------------------
   (function navToggle() {
@@ -129,11 +125,82 @@
     update();
   })();
 
+  // ======================================================================
+  // PER-PAGE widgets — re-run after every soft-nav content swap. Widgets
+  // that attach window-level listeners register a teardown so they don't
+  // leak (or keep pointing at a removed element) across navigations.
+  // ======================================================================
+  let teardowns = [];
+
+  function initContent() {
+    teardowns.forEach((fn) => fn());
+    teardowns = [];
+    initCarousels();
+    initGamesCarousel();
+    initHeroParallax();
+    initPressFlow();
+  }
+
+  // --- Image carousels ------------------------------------------------------
+  function initCarousels() {
+    document.querySelectorAll('[data-carousel]').forEach((root) => {
+      const slides = Array.from(root.querySelectorAll('.carousel__slide'));
+      if (slides.length <= 1) return;
+      let i = slides.findIndex((s) => s.classList.contains('is-active'));
+      if (i < 0) i = 0;
+      const show = (n) => {
+        slides[i].classList.remove('is-active');
+        i = (n + slides.length) % slides.length;
+        slides[i].classList.add('is-active');
+      };
+      const prev = root.querySelector('.carousel__prev');
+      const next = root.querySelector('.carousel__next');
+      if (prev) prev.addEventListener('click', () => show(i - 1));
+      if (next) next.addEventListener('click', () => show(i + 1));
+    });
+  }
+
+  // --- Games catalogue carousel (animated swipe) ----------------------------
+  function initGamesCarousel() {
+    document.querySelectorAll('[data-games-carousel]').forEach((root) => {
+      const track = root.querySelector('.games-track');
+      const slides = Array.from(root.querySelectorAll('.game-slide'));
+      const dots = Array.from(root.querySelectorAll('.games-dot'));
+      if (slides.length <= 1) return;
+      let i = 0;
+
+      function go(n) {
+        i = (n + slides.length) % slides.length; // wrap around
+        track.style.transform = `translateX(-${i * 100}%)`;
+        dots.forEach((d, k) => d.classList.toggle('is-active', k === i));
+      }
+
+      root.querySelector('[data-games-prev]')?.addEventListener('click', () => go(i - 1));
+      root.querySelector('[data-games-next]')?.addEventListener('click', () => go(i + 1));
+      dots.forEach((d) => d.addEventListener('click', () => go(parseInt(d.dataset.goto, 10))));
+
+      root.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') { go(i + 1); e.preventDefault(); }
+        else if (e.key === 'ArrowLeft') { go(i - 1); e.preventDefault(); }
+      });
+
+      // Touch / pointer swipe.
+      let startX = null;
+      root.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+      root.addEventListener('touchend', (e) => {
+        if (startX == null) return;
+        const dx = e.changedTouches[0].clientX - startX;
+        if (Math.abs(dx) > 50) go(dx < 0 ? i + 1 : i - 1);
+        startX = null;
+      });
+    });
+  }
+
   // --- Hero parallax (smoothed with a lerp so snappy scrolls stay smooth) ----
-  (function heroParallax() {
+  function initHeroParallax() {
     const media = document.querySelector('.hero__media');
     if (!media) return;
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reduceMotion) return;
     const hero = media.closest('.hero');
     let base = 50, maxPan = 0; // refreshed from CSS each recompute
     let goalProg = 0, current = 0; // scroll progress 0→1 (smoothed via `current`)
@@ -173,125 +240,166 @@
     recompute();
     current = goalProg;
     apply();
-  })();
-
-  // --- Games catalogue carousel (animated swipe) ----------------------------
-  document.querySelectorAll('[data-games-carousel]').forEach((root) => {
-    const track = root.querySelector('.games-track');
-    const slides = Array.from(root.querySelectorAll('.game-slide'));
-    const dots = Array.from(root.querySelectorAll('.games-dot'));
-    if (slides.length <= 1) return;
-    let i = 0;
-
-    function go(n) {
-      i = (n + slides.length) % slides.length; // wrap around
-      track.style.transform = `translateX(-${i * 100}%)`;
-      dots.forEach((d, k) => d.classList.toggle('is-active', k === i));
-    }
-
-    root.querySelector('[data-games-prev]')?.addEventListener('click', () => go(i - 1));
-    root.querySelector('[data-games-next]')?.addEventListener('click', () => go(i + 1));
-    dots.forEach((d) => d.addEventListener('click', () => go(parseInt(d.dataset.goto, 10))));
-
-    root.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight') { go(i + 1); e.preventDefault(); }
-      else if (e.key === 'ArrowLeft') { go(i - 1); e.preventDefault(); }
+    teardowns.push(() => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf != null) cancelAnimationFrame(raf);
     });
-
-    // Touch / pointer swipe.
-    let startX = null;
-    root.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
-    root.addEventListener('touchend', (e) => {
-      if (startX == null) return;
-      const dx = e.changedTouches[0].clientX - startX;
-      if (Math.abs(dx) > 50) go(dx < 0 ? i + 1 : i - 1);
-      startX = null;
-    });
-  });
-
-  // --- Press-kit flow -------------------------------------------------------
-  const flow = document.querySelector('[data-press-flow]');
-  if (!flow) return;
-
-  const stepType = flow.querySelector('[data-step="type"]');
-  const form = flow.querySelector('[data-step="form"]');
-  const confirm = flow.querySelector('[data-step="confirm"]');
-  const intro = form.querySelector('[data-form-intro]');
-  const hidden = form.querySelector('input[name="press_type"]');
-  const status = form.querySelector('.press-form__status');
-
-  const labelOutlet = form.querySelector('[data-label-outlet]');
-  const labelAudience = form.querySelector('[data-label-audience]');
-  const roleField = form.querySelector('[data-field="role"]');
-
-  const COPY = {
-    creator: {
-      intro: "Great — tell us about your channel and we'll sort you out with keys.",
-      outlet: 'Channel name',
-      audience: 'Subscriber / follower count',
-      showRole: false,
-    },
-    editorial: {
-      intro: "Thanks for covering us — a few details about your publication, please.",
-      outlet: 'Publication name',
-      audience: 'Readership / monthly visitors',
-      showRole: true,
-    },
-  };
-
-  function choose(type) {
-    const c = COPY[type];
-    if (!c) return;
-    hidden.value = type;
-    intro.textContent = c.intro;
-    if (labelOutlet) labelOutlet.textContent = c.outlet;
-    if (labelAudience) labelAudience.textContent = c.audience;
-    if (roleField) roleField.hidden = !c.showRole;
-    stepType.hidden = true;
-    form.hidden = false;
-    form.querySelector('input[name="name"]').focus();
   }
 
-  flow.querySelectorAll('[data-press-type]').forEach((btn) => {
-    btn.addEventListener('click', () => choose(btn.getAttribute('data-press-type')));
-  });
+  // --- Press-kit flow -------------------------------------------------------
+  function initPressFlow() {
+    const flow = document.querySelector('[data-press-flow]');
+    if (!flow) return;
 
-  const back = form.querySelector('[data-press-back]');
-  if (back)
-    back.addEventListener('click', () => {
-      form.hidden = true;
-      stepType.hidden = false;
+    const stepType = flow.querySelector('[data-step="type"]');
+    const form = flow.querySelector('[data-step="form"]');
+    const confirm = flow.querySelector('[data-step="confirm"]');
+    const intro = form.querySelector('[data-form-intro]');
+    const hidden = form.querySelector('input[name="press_type"]');
+    const status = form.querySelector('.press-form__status');
+
+    const labelOutlet = form.querySelector('[data-label-outlet]');
+    const labelAudience = form.querySelector('[data-label-audience]');
+    const roleField = form.querySelector('[data-field="role"]');
+
+    const COPY = {
+      creator: {
+        intro: "Great — tell us about your channel and we'll sort you out with keys.",
+        outlet: 'Channel name',
+        audience: 'Subscriber / follower count',
+        showRole: false,
+      },
+      editorial: {
+        intro: "Thanks for covering us — a few details about your publication, please.",
+        outlet: 'Publication name',
+        audience: 'Readership / monthly visitors',
+        showRole: true,
+      },
+    };
+
+    function choose(type) {
+      const c = COPY[type];
+      if (!c) return;
+      hidden.value = type;
+      intro.textContent = c.intro;
+      if (labelOutlet) labelOutlet.textContent = c.outlet;
+      if (labelAudience) labelAudience.textContent = c.audience;
+      if (roleField) roleField.hidden = !c.showRole;
+      stepType.hidden = true;
+      form.hidden = false;
+      form.querySelector('input[name="name"]').focus();
+    }
+
+    flow.querySelectorAll('[data-press-type]').forEach((btn) => {
+      btn.addEventListener('click', () => choose(btn.getAttribute('data-press-type')));
     });
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    status.classList.remove('is-error');
-    status.textContent = 'Sending…';
-    const fd = new FormData(form);
-    const payload = {
-      press_type: fd.get('press_type'),
-      name: fd.get('name'),
-      email: fd.get('email'),
-      outlet: fd.get('outlet'),
-      outlet_url: fd.get('outlet_url'),
-      audience: fd.get('audience'),
-      role: fd.get('role'),
-      message: fd.get('message'),
-      games: fd.getAll('games'),
-    };
-    try {
-      const res = await fetch('/press/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+    const back = form.querySelector('[data-press-back]');
+    if (back)
+      back.addEventListener('click', () => {
+        form.hidden = true;
+        stepType.hidden = false;
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Submission failed.');
-      form.hidden = true;
-      confirm.hidden = false;
-    } catch (err) {
-      status.classList.add('is-error');
-      status.textContent = err.message || 'Something went wrong. Please try again.';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      status.classList.remove('is-error');
+      status.textContent = 'Sending…';
+      const fd = new FormData(form);
+      const payload = {
+        press_type: fd.get('press_type'),
+        name: fd.get('name'),
+        email: fd.get('email'),
+        outlet: fd.get('outlet'),
+        outlet_url: fd.get('outlet_url'),
+        audience: fd.get('audience'),
+        role: fd.get('role'),
+        message: fd.get('message'),
+        games: fd.getAll('games'),
+      };
+      try {
+        const res = await fetch('/press/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Submission failed.');
+        form.hidden = true;
+        confirm.hidden = false;
+      } catch (err) {
+        status.classList.add('is-error');
+        status.textContent = err.message || 'Something went wrong. Please try again.';
+      }
+    });
+  }
+
+  // ======================================================================
+  // Soft navigation — keep the header (and its running animation) alive.
+  // Only the standard "shell" pages (same layout + app.js, no per-page head
+  // scripts) participate; everything else falls back to a full page load.
+  // ======================================================================
+  (function softNav() {
+    const main = document.getElementById('main');
+    if (!main || !window.history.pushState) return;
+    // Don't intercept on pages with their own scripts/state (edit mode, the
+    // pitch-deck viewer/editor) — those need a real load to set up correctly.
+    const cls = document.body.classList;
+    if (cls.contains('is-edit') || cls.contains('page-deck') || cls.contains('page-deck-edit')) return;
+
+    const SHELL = new Set(['/', '/games', '/about', '/press']);
+    let token = 0; // guards against out-of-order responses when clicking fast
+    history.scrollRestoration = 'manual';
+
+    async function navigate(path, push) {
+      const mine = ++token;
+      let html;
+      try {
+        const res = await fetch(path, { headers: { 'X-Requested-With': 'softnav' } });
+        if (!res.ok || res.redirected) { location.href = path; return; }
+        html = await res.text();
+      } catch { location.href = path; return; }
+      if (mine !== token) return; // a newer navigation superseded this one
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const newMain = doc.getElementById('main');
+      // Bail to a full load if the target isn't a normal shell page after all.
+      if (!newMain || doc.body.classList.contains('is-edit') ||
+          doc.body.classList.contains('page-deck')) { location.href = path; return; }
+      document.title = doc.title;
+      document.body.className = doc.body.className;
+      main.innerHTML = newMain.innerHTML;
+      if (push) history.pushState({ softnav: true }, '', path);
+      window.scrollTo(0, 0);
+      initContent();
+      // Nudge the persistent scroll indicator to re-measure the new page height.
+      window.dispatchEvent(new Event('resize'));
+      // Move focus to the new content for keyboard / screen-reader users.
+      main.setAttribute('tabindex', '-1');
+      main.focus({ preventScroll: true });
     }
-  });
+
+    document.addEventListener('click', (e) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = e.target.closest('.site-nav a, .site-nav-drop a, .brand');
+      if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
+      let u;
+      try { u = new URL(a.getAttribute('href'), location.href); } catch { return; }
+      if (u.origin !== location.origin || !SHELL.has(u.pathname)) return; // let the browser handle it
+      e.preventDefault();
+      if (u.pathname === location.pathname && u.search === location.search) {
+        window.scrollTo({ top: 0, behavior: 'smooth' }); // same page → just go up
+        return;
+      }
+      navigate(u.pathname + u.search, true);
+    });
+
+    window.addEventListener('popstate', () => {
+      if (SHELL.has(location.pathname)) navigate(location.pathname + location.search, false);
+      else location.reload();
+    });
+  })();
+
+  // First (server-rendered) page.
+  initContent();
 })();

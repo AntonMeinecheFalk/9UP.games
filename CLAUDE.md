@@ -22,7 +22,19 @@ together, the design conventions, and how it's deployed.
 - `src/auth.js` — secret check + signed-cookie edit sessions.
 - `src/media.js` — upload pipeline (multer + sharp), serving paths.
 - `public/css/styles.css` — the entire design system (one file).
-- `public/js/` — `app.js` (public: carousels, press flow, **hamburger nav**, **hero parallax**), `edit.js` (edit mode), `deck.js`/`deck-edit.js`.
+- `public/js/` — `app.js` (public: carousels, press flow, **hamburger nav**, **hero parallax**,
+  **click feedback**, **soft nav**), `edit.js` (edit mode), `deck.js`/`deck-edit.js`.
+  - `app.js` splits into **global widgets** wired once (click feedback, nav toggle, scroll indicator —
+    they live on the persistent header/body) and **per-page widgets** (`initContent()`: carousels,
+    games carousel, hero parallax, press flow). `initContent()` re-runs after every soft-nav swap; any
+    widget adding window listeners registers a teardown (in `teardowns[]`) so it doesn't leak.
+- **Soft nav** (`app.js` → `softNav`): clicks on header/brand links to the four **shell** pages
+  (`/`, `/games`, `/about`, `/press`) fetch the target and swap **only `<main>`** (+ `<title>` + body
+  class), leaving `<header>`, the `.fx-layer`, and the scroll indicator in place — so a click's bounce
+  + shockwave keep playing across the navigation instead of being torn down. Falls back to a full load
+  on edit mode, deck pages (`is-edit`/`page-deck*` body classes), external/modified/`_blank` clicks, or
+  any fetch hiccup; `history`/`popstate` wired for back-forward. Non-shell links (game cards, deck) load
+  normally.
 - Content lives in `data/site.db` + `media/` — **git-ignored**; they travel with the data, not the code.
 
 ## Edit mode
