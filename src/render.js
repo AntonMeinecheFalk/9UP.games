@@ -144,7 +144,13 @@ ${extraHead}
   <div class="wrap">
     <div class="brand-group">
       <a class="brand" href="/">
-        ${siteLogo ? `<img class="brand__logo" src="${escapeHtml(mediaUrl(siteLogo))}" alt="">` : ''}
+        ${
+          siteLogo
+            ? `<span class="brand__logo" style="--logo-url:url('${escapeHtml(mediaUrl(siteLogo))}')"><img src="${escapeHtml(
+                mediaUrl(siteLogo)
+              )}" alt=""></span>`
+            : ''
+        }
         <span>${siteTitle}</span>
       </a>
       ${

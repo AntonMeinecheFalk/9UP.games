@@ -140,12 +140,23 @@ body.page-admin #main, body.page-deck-edit #main {
   font-family: var(--font-heading); text-shadow: var(--text-shadow);
   transition: color 0.2s ease;
 }
-/* On hover the white pill covers the brand, so flip the logo + text dark so they
-   stay legible (the white logo would otherwise vanish on the white pill). */
-.brand:hover, .brand:focus-visible { text-decoration: none; color: #16202b; text-shadow: none; }
-.brand:hover .brand__logo, .brand:focus-visible .brand__logo { filter: brightness(0); }
-/* Logo gets the same drop shadow as the brand text. */
-.brand__logo { height: 34px; width: auto; display: block; filter: drop-shadow(var(--text-shadow)); transition: filter 0.2s ease; }
+/* On hover the white pill covers the brand, so recolour the logo + text to the
+   nav-link blue (--accent-2) so they stay legible on the white pill. */
+.brand:hover, .brand:focus-visible { text-decoration: none; color: var(--accent-2); text-shadow: none; }
+/* The logo is a white PNG, whose colour can't be transitioned directly — so we
+   cross-fade (over the same 0.2s as the text) the original image OUT and an
+   --accent-2 tint IN: the same logo art used as a mask over a solid accent fill.
+   Cross-fading the image out also fades its drop shadow, avoiding an abrupt pop. */
+.brand__logo { position: relative; display: inline-block; line-height: 0; }
+.brand__logo img { height: 34px; width: auto; display: block; filter: drop-shadow(var(--text-shadow)); transition: opacity 0.2s ease; }
+.brand__logo::after {
+  content: ""; position: absolute; inset: 0; background: var(--accent-2);
+  -webkit-mask: var(--logo-url) center / contain no-repeat;
+  mask: var(--logo-url) center / contain no-repeat;
+  opacity: 0; transition: opacity 0.2s ease;
+}
+.brand:hover .brand__logo img, .brand:focus-visible .brand__logo img { opacity: 0; }
+.brand:hover .brand__logo::after, .brand:focus-visible .brand__logo::after { opacity: 1; }
 .brand-edit { display: inline-flex; gap: 0.3rem; }
 .site-nav a, .site-nav-drop a { color: var(--fg); font-weight: 600; text-shadow: var(--text-shadow); }
 .site-nav a:hover, .site-nav-drop a:hover { color: var(--accent-2); text-decoration: none; }
