@@ -447,18 +447,45 @@ body.page-admin #main, body.page-deck-edit #main {
 .prose blockquote { border-left: 3px solid var(--accent); margin: 1rem 0; padding-left: 1rem; color: var(--fg-muted); }
 
 /* --- carousel --- */
-.carousel { position: relative; background: var(--bg-elev); border-radius: var(--radius); overflow: hidden; }
+.carousel { position: relative; background: var(--bg-elev); border-radius: 20px; overflow: hidden; }
 .carousel__track { position: relative; }
 .carousel__slide { display: none; }
 .carousel__slide.is-active { display: block; }
-.carousel__slide img { width: 100%; max-height: 70vh; object-fit: contain; background: #000; }
-.carousel__nav {
-  position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
-  background: rgba(0,0,0,0.5); color: #fff; border: none; font-size: 2rem;
-  width: 48px; height: 64px; cursor: pointer; border-radius: var(--radius-sm);
+.carousel__slide img { width: 100%; max-height: 70vh; object-fit: contain; background: #000; display: block; }
+/* Glass-style top rim light over the rounded image. */
+.carousel::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 2; pointer-events: none;
+  border-top: 2px solid var(--btn-highlight); mix-blend-mode: screen; opacity: 0.5;
 }
-.carousel__prev { left: 0.5rem; }
-.carousel__next { right: 0.5rem; }
+/* Arrows match the pitch-deck arrows: frosted disc + top rim + triangle; on
+   hover the triangle is punched out of a white disc as a see-through hole. */
+.carousel__nav {
+  position: absolute; top: 50%; z-index: 3;
+  width: 52px; height: 52px; border-radius: 50%; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  transform: translateY(-50%) scale(1);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s ease;
+}
+.carousel__nav::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  border-top: 2px solid var(--btn-highlight); mix-blend-mode: screen; opacity: 0.6;
+}
+.carousel__prev { left: 0.75rem; }
+.carousel__next { right: 0.75rem; }
+.carousel__tri { width: 22px; height: 22px; color: #fff; transition: opacity 0.25s ease; }
+.carousel__tri path { fill: currentColor; stroke: currentColor; stroke-width: 3; stroke-linejoin: round; }
+.carousel__prev .carousel__tri { transform: scaleX(-1); }
+.carousel__next { --arrow-hole: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 66'><path fill='%23fff' fill-rule='evenodd' d='M0 0H66V66H0Z M31.2 22.7 L42.8 30.3 Q47 33 42.8 35.7 L31.2 43.3 Q27 46 27 41 L27 25 Q27 20 31.2 22.7 Z'/></svg>"); }
+.carousel__prev { --arrow-hole: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 66'><path fill='%23fff' fill-rule='evenodd' d='M0 0H66V66H0Z M34.8 22.7 L23.2 30.3 Q19 33 23.2 35.7 L34.8 43.3 Q39 46 39 41 L39 25 Q39 20 34.8 22.7 Z'/></svg>"); }
+.carousel__nav:hover, .carousel__nav:focus-visible {
+  transform: translateY(-50%) scale(1.12); background: #fff;
+  -webkit-mask-image: var(--arrow-hole); mask-image: var(--arrow-hole);
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+}
+.carousel__nav:hover::before, .carousel__nav:focus-visible::before { opacity: 0; }
+.carousel__nav:hover .carousel__tri, .carousel__nav:focus-visible .carousel__tri { opacity: 0; }
 .carousel__edit { display: flex; gap: 0.5rem; padding: 0.5rem; background: var(--bg-card); }
 .carousel__edit input { flex: 1; }
 .carousel__add { padding: 0.75rem; }

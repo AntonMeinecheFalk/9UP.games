@@ -465,10 +465,13 @@ function renderCarousel(section, editMode) {
     })
     .join('');
 
+  // Same triangle as the pitch-deck arrows (prev is flipped in CSS).
+  const tri =
+    '<svg class="carousel__tri" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L17.5 12 L9 18 Z"/></svg>';
   const controls =
     images.length > 1
-      ? `<button class="carousel__nav carousel__prev" aria-label="Previous">‹</button>
-         <button class="carousel__nav carousel__next" aria-label="Next">›</button>`
+      ? `<button class="carousel__nav carousel__prev" aria-label="Previous">${tri}</button>
+         <button class="carousel__nav carousel__next" aria-label="Next">${tri}</button>`
       : '';
 
   return `<div class="carousel" data-carousel data-section-id="${section.id}">
