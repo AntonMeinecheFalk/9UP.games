@@ -454,6 +454,7 @@ body.page-admin #main, body.page-deck-edit #main {
 .carousel__track {
   position: relative; aspect-ratio: 16 / 9; overflow: hidden;
   border-radius: 20px; background: var(--bg-elev);
+  box-shadow: 0 20px 50px -10px var(--btn-shadow);
 }
 .carousel__slide { position: absolute; inset: 0; margin: 0; display: none; }
 .carousel__slide.is-active { display: block; }
