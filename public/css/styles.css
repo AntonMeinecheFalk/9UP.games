@@ -32,6 +32,12 @@
   --shadow: 0 6px 24px color-mix(in srgb, var(--btn-shadow) 40%, transparent);
   --text-shadow: 0 1px 6px color-mix(in srgb, var(--btn-shadow) 50%, transparent);
   --text-shadow-strong: 0 2px 18px color-mix(in srgb, var(--btn-shadow) 60%, transparent);
+  /* Cast shadow shared by the floating glass panels (pitch box, dropdown, carousel). */
+  --shadow-panel: 0 20px 50px -10px var(--btn-shadow);
+  /* Glass blur levels (used with both backdrop-filter and -webkit-backdrop-filter). */
+  --blur-sm: blur(8px);
+  --blur-md: blur(10px);
+  --blur-lg: blur(16px);
 }
 
 * { box-sizing: border-box; }
@@ -46,7 +52,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
 .scroll-indicator {
   position: fixed; top: 0; right: 7px; z-index: 50;
   width: 8px; height: 12.5vh; border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: var(--blur-sm); backdrop-filter: var(--blur-sm);
   cursor: grab; pointer-events: auto;
   transition: background 0.2s ease;
 }
@@ -98,7 +104,7 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
    backdrop blur, a 50% screen-blend top rim, and a button-coloured drop shadow. */
 .site-header {
   position: fixed; top: 0; left: 0; right: 0; z-index: 30;
-  background: transparent; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  background: transparent; -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
   box-shadow: 0 8px 24px -10px var(--btn-shadow);
   /* Glass + blur extend up under the status bar / notch; the inner .wrap sits
      below the inset so the brand and menu stay clear of it. Fixed (not sticky)
@@ -276,9 +282,9 @@ body.page-admin #main, body.page-deck-edit #main {
   background: transparent;
   border-radius: 28px;
   padding: 1.5rem 1.75rem;
-  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
   /* cast shadow inherits the button shadow colour */
-  box-shadow: 0 20px 50px -10px var(--btn-shadow);
+  box-shadow: var(--shadow-panel);
 }
 /* top-only rim light, same screen-blended highlight colour as the buttons */
 .hero__panel::before {
@@ -354,7 +360,7 @@ body.page-admin #main, body.page-deck-edit #main {
 }
 .hero__edit {
   display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;
-  background: rgba(var(--bg-rgb), 0.8); backdrop-filter: blur(10px);
+  background: rgba(var(--bg-rgb), 0.8); -webkit-backdrop-filter: var(--blur-md); backdrop-filter: var(--blur-md);
   border: 1px solid var(--border); border-radius: var(--radius);
   padding: 0.6rem 0.7rem; box-shadow: var(--shadow);
 }
@@ -362,7 +368,7 @@ body.page-admin #main, body.page-deck-edit #main {
 .hero__edit .ctl-inline input { width: 200px; max-width: 45vw; }
 /* Per-game hero/logo adjust panel (edit mode) — drops below the controls card. */
 .hero-adjust {
-  background: rgba(var(--bg-rgb), 0.92); backdrop-filter: blur(10px);
+  background: rgba(var(--bg-rgb), 0.92); -webkit-backdrop-filter: var(--blur-md); backdrop-filter: var(--blur-md);
   border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
   padding: 1rem 1.25rem; display: flex; gap: 1.5rem; flex-wrap: wrap;
 }
@@ -412,7 +418,7 @@ body.page-admin #main, body.page-deck-edit #main {
   position: absolute; top: 50%; transform: translateY(-50%); z-index: 3;
   width: 56px; height: 72px; border: none; cursor: pointer;
   background: rgba(0,0,0,0.45); color: #fff; font-size: 2.25rem; line-height: 1;
-  border-radius: var(--radius); backdrop-filter: blur(4px); transition: background 0.15s ease;
+  border-radius: var(--radius); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); transition: background 0.15s ease;
 }
 .games-nav:hover { background: rgba(0,0,0,0.7); }
 .games-prev { left: 1rem; }
@@ -429,7 +435,6 @@ body.page-admin #main, body.page-deck-edit #main {
 /* --- sections --- */
 .sections { padding: 3rem 1.25rem; display: flex; flex-direction: column; gap: 2.5rem; }
 .section { position: relative; }
-.section__body { }
 .sec-ctl {
   display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.75rem;
   padding: 0.4rem; background: var(--bg-elev); border: 1px solid var(--border);
@@ -454,7 +459,7 @@ body.page-admin #main, body.page-deck-edit #main {
 .carousel__track {
   position: relative; aspect-ratio: 16 / 9; overflow: hidden;
   border-radius: 20px; background: var(--bg-elev);
-  box-shadow: 0 20px 50px -10px var(--btn-shadow);
+  box-shadow: var(--shadow-panel);
 }
 .carousel__slide { position: absolute; inset: 0; margin: 0; display: none; }
 .carousel__slide.is-active { display: block; }
@@ -466,36 +471,38 @@ body.page-admin #main, body.page-deck-edit #main {
 }
 /* Edit-mode alt/remove caption overlays the bottom of the active slide. */
 .carousel__slide .carousel__edit { position: absolute; left: 0.5rem; right: 0.5rem; bottom: 0.5rem; z-index: 3; border-radius: var(--radius-sm); }
-/* Arrows match the pitch-deck arrows: frosted disc + top rim + triangle; on
-   hover the triangle is punched out of a white disc as a see-through hole.
-   Positioned in the gutters, just outside the frame. */
-.carousel__nav {
-  position: absolute; top: 50%; z-index: 3;
-  width: 52px; height: 52px; border-radius: 50%; border: none; cursor: pointer;
+/* --- shared glass arrow (image carousel + pitch-deck viewer) ---------------
+   Frosted disc + top rim + triangle. On hover it bounce-grows and the triangle
+   is punched out of a white disc as a see-through hole. Size via --arrow-size /
+   --tri-size; direction via --prev/--next. */
+.glass-arrow {
+  position: absolute; top: 50%; z-index: 3; transform: translateY(-50%) scale(1);
+  width: var(--arrow-size, 52px); height: var(--arrow-size, 52px);
+  border: none; border-radius: 50%; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  transform: translateY(-50%) scale(1);
-  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s ease;
+  background: rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: var(--blur-md); backdrop-filter: var(--blur-md);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s ease, opacity 0.3s ease;
 }
-.carousel__nav::before {
+.glass-arrow::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   border-top: 2px solid var(--btn-highlight); mix-blend-mode: screen; opacity: 0.6;
 }
-.carousel__prev { left: 0; }
-.carousel__next { right: 0; }
-.carousel__tri { width: 22px; height: 22px; color: #fff; transition: opacity 0.25s ease; }
-.carousel__tri path { fill: currentColor; stroke: currentColor; stroke-width: 3; stroke-linejoin: round; }
-.carousel__prev .carousel__tri { transform: scaleX(-1); }
-.carousel__next { --arrow-hole: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 66'><path fill='%23fff' fill-rule='evenodd' d='M0 0H66V66H0Z M31.2 22.7 L42.8 30.3 Q47 33 42.8 35.7 L31.2 43.3 Q27 46 27 41 L27 25 Q27 20 31.2 22.7 Z'/></svg>"); }
-.carousel__prev { --arrow-hole: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 66'><path fill='%23fff' fill-rule='evenodd' d='M0 0H66V66H0Z M34.8 22.7 L23.2 30.3 Q19 33 23.2 35.7 L34.8 43.3 Q39 46 39 41 L39 25 Q39 20 34.8 22.7 Z'/></svg>"); }
-.carousel__nav:hover, .carousel__nav:focus-visible {
+.glass-arrow__tri { width: var(--tri-size, 22px); height: var(--tri-size, 22px); color: #fff; transition: opacity 0.25s ease; }
+.glass-arrow__tri path { fill: currentColor; stroke: currentColor; stroke-width: 3; stroke-linejoin: round; }
+.glass-arrow--prev .glass-arrow__tri { transform: scaleX(-1); }
+.glass-arrow--next { --arrow-hole: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 66'><path fill='%23fff' fill-rule='evenodd' d='M0 0H66V66H0Z M31.2 22.7 L42.8 30.3 Q47 33 42.8 35.7 L31.2 43.3 Q27 46 27 41 L27 25 Q27 20 31.2 22.7 Z'/></svg>"); }
+.glass-arrow--prev { --arrow-hole: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 66'><path fill='%23fff' fill-rule='evenodd' d='M0 0H66V66H0Z M34.8 22.7 L23.2 30.3 Q19 33 23.2 35.7 L34.8 43.3 Q39 46 39 41 L39 25 Q39 20 34.8 22.7 Z'/></svg>"); }
+.glass-arrow:hover, .glass-arrow:focus-visible {
   transform: translateY(-50%) scale(1.12); background: #fff;
   -webkit-mask-image: var(--arrow-hole); mask-image: var(--arrow-hole);
   -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
 }
-.carousel__nav:hover::before, .carousel__nav:focus-visible::before { opacity: 0; }
-.carousel__nav:hover .carousel__tri, .carousel__nav:focus-visible .carousel__tri { opacity: 0; }
+.glass-arrow:hover::before, .glass-arrow:focus-visible::before { opacity: 0; }
+.glass-arrow:hover .glass-arrow__tri, .glass-arrow:focus-visible .glass-arrow__tri { opacity: 0; }
+/* Carousel arrows sit in the side gutters, just outside the frame. */
+.carousel__prev { left: 0; }
+.carousel__next { right: 0; }
 .carousel__edit { display: flex; gap: 0.5rem; padding: 0.5rem; background: var(--bg-card); }
 .carousel__edit input { flex: 1; }
 .carousel__add { padding: 0.75rem; }
@@ -515,7 +522,7 @@ body.page-admin #main, body.page-deck-edit #main {
 .video-play {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: 76px; height: 76px; border-radius: 50%; border: none; cursor: pointer;
-  background: rgba(255, 255, 255, 0.16); backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.16); -webkit-backdrop-filter: var(--blur-sm); backdrop-filter: var(--blur-sm);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35); transition: transform 0.2s ease, background 0.2s ease;
 }
 .video-play::before {
@@ -527,7 +534,7 @@ body.page-admin #main, body.page-deck-edit #main {
 /* Our own video controls (replace the platform chrome). */
 .deck-video__close, .deck-video__pp {
   position: absolute; z-index: 4; border: none; cursor: pointer; color: #fff; line-height: 1;
-  background: rgba(255, 255, 255, 0.16); backdrop-filter: blur(8px); border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16); -webkit-backdrop-filter: var(--blur-sm); backdrop-filter: var(--blur-sm); border-radius: 50%;
   display: flex; align-items: center; justify-content: center; transition: background 0.2s ease;
 }
 .deck-video__close:hover, .deck-video__pp:hover { background: rgba(255, 255, 255, 0.34); }
@@ -680,48 +687,21 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   max-width: none; aspect-ratio: auto; border-radius: 0; margin: 0;
 }
 .slide-block--video .video-frame img { object-fit: contain; }
-/* Circular glass nav buttons on each side; white rounded-triangle arrow. On
-   hover they bounce-grow and invert (glass -> white, arrow -> glass). */
-.deck-arrow {
-  position: absolute; top: 50%; left: auto; z-index: 12;
-  width: 66px; height: 66px; border-radius: 50%; border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);
-  transform: translateY(-50%) scale(1);
-  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s ease, opacity 0.3s ease;
-}
-.deck-arrow::before { /* top rim light, like the glass box */
-  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  border-top: 2px solid var(--btn-highlight); mix-blend-mode: screen; opacity: 0.6;
-}
+/* Deck viewer arrows = the shared .glass-arrow, just bigger and pinned to the
+   viewport edges. */
+.deck-arrow { --arrow-size: 66px; --tri-size: 28px; z-index: 12; }
 .deck-arrow--prev { left: 2.5vw; }
 .deck-arrow--next { right: 2.5vw; }
-.deck-arrow__tri { width: 28px; height: 28px; color: #fff; transition: color 0.25s ease; }
-.deck-arrow__tri path { fill: currentColor; stroke: currentColor; stroke-width: 3; stroke-linejoin: round; }
-.deck-arrow--prev .deck-arrow__tri { transform: scaleX(-1); }
-/* On hover the arrow is a real see-through hole punched out of a white disc
-   (mask = full circle minus the triangle), so the slide shows through it. */
-.deck-arrow--next { --arrow-hole: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 66'><path fill='%23fff' fill-rule='evenodd' d='M0 0H66V66H0Z M31.2 22.7 L42.8 30.3 Q47 33 42.8 35.7 L31.2 43.3 Q27 46 27 41 L27 25 Q27 20 31.2 22.7 Z'/></svg>"); }
-.deck-arrow--prev { --arrow-hole: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 66'><path fill='%23fff' fill-rule='evenodd' d='M0 0H66V66H0Z M34.8 22.7 L23.2 30.3 Q19 33 23.2 35.7 L34.8 43.3 Q39 46 39 41 L39 25 Q39 20 34.8 22.7 Z'/></svg>"); }
-.deck-arrow:hover, .deck-arrow:focus-visible {
-  transform: translateY(-50%) scale(1.12);
-  background: #fff;
-  -webkit-mask-image: var(--arrow-hole); mask-image: var(--arrow-hole);
-  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
-}
-.deck-arrow:hover::before, .deck-arrow:focus-visible::before { opacity: 0; } /* no rim on hover */
-.deck-arrow:hover .deck-arrow__tri, .deck-arrow:focus-visible .deck-arrow__tri { opacity: 0; }
 /* Discreet corner close (not bottom UI); auto-hides with the arrows. */
 .deck-close {
   position: absolute; top: 1.25rem; right: 1.5rem; z-index: 12;
   width: 40px; height: 40px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: var(--blur-md); backdrop-filter: var(--blur-md);
   color: #fff; font-size: 1.1rem; transition: opacity 0.3s ease, background 0.2s ease;
 }
 .deck-close:hover { background: rgba(255, 255, 255, 0.25); text-decoration: none; }
-@media (prefers-reduced-motion: reduce) { .deck-arrow { transition: background 0.2s ease, opacity 0.3s ease; } }
+@media (prefers-reduced-motion: reduce) { .glass-arrow { transition: background 0.2s ease, opacity 0.3s ease; } }
 
 /* ============================================================================
    Pitch deck — editor
@@ -798,9 +778,9 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
        readable over the bright top-of-hero art (the pitch box gets that contrast
        for free by sitting over darker art). */
     background: rgba(13, 48, 74, 0.42);
-    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
     border-radius: 28px;
-    box-shadow: 0 20px 50px -10px var(--btn-shadow);
+    box-shadow: var(--shadow-panel);
     /* Collapsed by default (base sets display:none); .is-open reveals it. */
   }
   .site-nav-drop.is-open { display: flex; }

@@ -1,7 +1,7 @@
 // Pitch-deck rendering: a public full-screen viewer and an edit-mode
 // Google-Slides-style editor. Images on slides are displayed at full
 // resolution (originals) — never downressed.
-import { layout, renderSlideBlock, toEmbedUrl } from './render.js';
+import { layout, renderSlideBlock, toEmbedUrl, triSvg } from './render.js';
 import { escapeHtml } from './sanitize.js';
 import { getMedia, mediaUrl, thumbUrl } from './media.js';
 
@@ -26,12 +26,10 @@ export function renderDeckViewer(game, slides) {
         .join('')
     : '<section class="deck-slide is-active"><div class="deck-slide__inner"><p class="muted">This deck is empty.</p></div></section>';
 
-  const tri =
-    '<svg class="deck-arrow__tri" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L17.5 12 L9 18 Z"/></svg>';
   const body = `<div class="deck-viewer" data-deck-viewer tabindex="0">
     <div class="deck-stage">${slidesHtml}</div>
-    <button class="deck-arrow deck-arrow--prev" data-deck-prev aria-label="Previous slide">${tri}</button>
-    <button class="deck-arrow deck-arrow--next" data-deck-next aria-label="Next slide">${tri}</button>
+    <button class="glass-arrow glass-arrow--prev deck-arrow deck-arrow--prev" data-deck-prev aria-label="Previous slide">${triSvg()}</button>
+    <button class="glass-arrow glass-arrow--next deck-arrow deck-arrow--next" data-deck-next aria-label="Next slide">${triSvg()}</button>
     <a class="deck-close" href="/game/${escapeHtml(game.slug)}" aria-label="Close presentation">✕</a>
   </div>`;
 

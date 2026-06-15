@@ -16,6 +16,11 @@ import {
   parseDisplay,
 } from './models.js';
 
+// The triangle glyph used by every .glass-arrow (carousel + pitch deck).
+// Direction (flip) and the hover hole are handled in CSS.
+export const triSvg = () =>
+  '<svg class="glass-arrow__tri" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L17.5 12 L9 18 Z"/></svg>';
+
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const THEME_LABELS = {
   bg: 'Background',
@@ -465,13 +470,10 @@ function renderCarousel(section, editMode) {
     })
     .join('');
 
-  // Same triangle as the pitch-deck arrows (prev is flipped in CSS).
-  const tri =
-    '<svg class="carousel__tri" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L17.5 12 L9 18 Z"/></svg>';
   const controls =
     images.length > 1
-      ? `<button class="carousel__nav carousel__prev" aria-label="Previous">${tri}</button>
-         <button class="carousel__nav carousel__next" aria-label="Next">${tri}</button>`
+      ? `<button class="glass-arrow glass-arrow--prev carousel__prev" aria-label="Previous">${triSvg()}</button>
+         <button class="glass-arrow glass-arrow--next carousel__next" aria-label="Next">${triSvg()}</button>`
       : '';
 
   return `<div class="carousel" data-carousel data-section-id="${section.id}">

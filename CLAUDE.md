@@ -33,12 +33,22 @@ A wrong secret returns a plain 404.
 ## Design system & responsive conventions
 - **Theme** is data-driven: colors/fonts in SQLite → CSS custom properties via
   `themeStyle()` in `render.js` (`--bg`, `--accent`, `--btn-shadow`, etc.). Editable live in edit mode (🎨 panel).
-- **"Glass" treatment** (header, elevator-pitch box, hamburger dropdown): transparent
-  bg + `backdrop-filter: blur(16px)`, a screen-blend rim light, a `--btn-shadow` drop shadow, 28px radius.
-  - ⚠️ **Backdrop-filter nesting:** an ancestor with `backdrop-filter` is a "backdrop root" — a
-    nested element's own blur then has nothing to filter. The header's blur lives on a dedicated
-    `.site-header__glass` layer (not on `.site-header`) so the descendant dropdown can blur too.
+- **Shared design tokens** in `:root`: `--shadow-panel` (the floating-panel cast shadow),
+  `--blur-sm/md/lg` (used for **both** `backdrop-filter` and `-webkit-backdrop-filter` — always
+  emit both prefixes), `--shadow`/`--text-shadow*`. Reuse these rather than re-hardcoding.
+- **"Glass" treatment** (header, elevator-pitch box, hamburger dropdown, carousel frame): transparent/
+  tinted bg + `var(--blur-lg)`, a screen-blend rim light (`border-top/bottom: 2px solid var(--btn-highlight); mix-blend-mode: screen`), `box-shadow: var(--shadow-panel)`, ~20–28px radius.
+  - ⚠️ **Backdrop-filter nesting:** an ancestor with `backdrop-filter` is a "backdrop root", so a
+    nested element's own blur has nothing left to filter (and it fails entirely at a negative
+    z-index). That's why the mobile dropdown (`.site-nav-drop`) is rendered as a fixed sibling
+    **outside** `<header>` (the header keeps its own `backdrop-filter`), and why glass layers use
+    non-negative z-index.
   - Horizontal dividers fade out toward **both** ends (`transparent → highlight → transparent`).
+- **`.glass-arrow`** (`public/css/styles.css`) is the single shared circular arrow used by BOTH the
+  image carousel and the pitch-deck viewer: frosted disc + rim + triangle, hover punches the triangle
+  out of a white disc (the `--arrow-hole` mask). Size via `--arrow-size`/`--tri-size`, direction via
+  `--prev`/`--next`. Markup adds `glass-arrow glass-arrow--prev/next` + a context class for position
+  (`carousel__prev/next`, `deck-arrow`). The triangle SVG comes from `triSvg()` exported by `render.js`.
 - **Per-game hero framing** is stored in each game's `display` JSON (`parseDisplay`), with
   **separate desktop and mobile controls** (edit mode → "Adjust hero & logo"):
   - Desktop: `heroPosX/heroPosY` (object-position focus), `heroZoom`.
