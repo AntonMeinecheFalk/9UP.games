@@ -115,22 +115,24 @@ body.page-admin #main, body.page-deck-edit #main {
    itself) so the header isn't a "backdrop root" — that lets the hamburger
    dropdown, which is a descendant, run its OWN backdrop blur of the page. */
 .site-header__glass {
-  position: absolute; inset: 0; z-index: -2; pointer-events: none;
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
 }
 /* Bottom rim light that fades out toward the left/right edges. */
 .site-header::before {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none;
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; z-index: 2; pointer-events: none;
   background: linear-gradient(to right, transparent 0%, var(--btn-highlight) 18%, var(--btn-highlight) 82%, transparent 100%);
   mix-blend-mode: screen; opacity: 0.5;
 }
-/* Multiply darkening in the shadow colour (saturation boosted), behind the bar. */
+/* Multiply darkening in the shadow colour (saturation boosted), over the blur.
+   Non-negative z-indices throughout: backdrop-filter on the glass layer fails to
+   capture the page when it sits at a negative z-index. */
 .site-header::after {
-  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: var(--btn-shadow); mix-blend-mode: multiply; opacity: 0.35;
   filter: saturate(2.5);
 }
-.site-header .wrap { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.site-header .wrap { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .brand-group { display: flex; align-items: center; gap: 0.75rem; }
 .brand {
   display: flex; align-items: center; gap: 0.6rem;
