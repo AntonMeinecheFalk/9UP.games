@@ -265,21 +265,17 @@ body.page-admin #main, body.page-deck-edit #main {
 .button-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 
 /* --- click feedback: a ring shockwave that matches the button's shape --------
-   Spawned by app.js on press into .fx-layer; sized to the button and given the
-   button's border-radius (circle/pill/etc.). Grows to ~2x while its outline
-   thins to nothing. The press bounce itself is a Web-Animations `scale` (in
-   app.js) so it composes with each button's existing transform/hover. */
+   Spawned by app.js on press into .fx-layer; starts as the button's exact outline
+   (size + corner radius) and expands by a CONSTANT offset on every side (the box
+   grows by 2d, the radius by d) so every point of the ring stays equidistant from
+   the button — a pill becomes two half-circles joined by parallel lines, not a
+   bigger pill. The geometry is per-button so app.js drives it via Web-Animations;
+   this rule just sets the look. The press bounce is likewise a WAAPI `scale`. */
 .fx-layer { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 9999; }
 .shockwave {
   position: absolute; box-sizing: border-box; pointer-events: none;
   border: 3px solid var(--btn-highlight, #fff);
-  animation: shockwave 0.55s cubic-bezier(0.2, 0.6, 0.35, 1) forwards;
 }
-@keyframes shockwave {
-  from { transform: scale(1); border-width: 3px; opacity: 0.85; }
-  to   { transform: scale(2); border-width: 0;   opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) { .shockwave { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   .btn { transition: filter 0.2s ease, transform 0.2s ease; }

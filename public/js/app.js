@@ -22,6 +22,16 @@
     const fxLayer = () => (layer || (layer = document.body.appendChild(
       Object.assign(document.createElement('div'), { className: 'fx-layer' })
     )));
+    // The button's actual rendered corner radius in px — clamped to half the
+    // shorter side (so a "999px"/"50%" pill resolves to its real end radius) and
+    // resolving a percentage against the box. This is the radius the equidistant
+    // ring starts from; growing the box by d and the radius by d keeps the offset
+    // constant everywhere.
+    const effectiveRadius = (btn, r) => {
+      const br = getComputedStyle(btn).borderTopLeftRadius;
+      const val = br.endsWith('%') ? (parseFloat(br) / 100) * Math.min(r.width, r.height) : (parseFloat(br) || 0);
+      return Math.min(val, r.width / 2, r.height / 2);
+    };
     document.addEventListener('pointerdown', (e) => {
       if (e.button != null && e.button !== 0) return; // primary button only
       const btn = e.target.closest(SELECTOR);
@@ -36,17 +46,29 @@
         ],
         { duration: 460, easing: 'ease-out' }
       );
-      // Shockwave: a ring the size + shape (border-radius) of the button. Lives
-      // in the body-level .fx-layer, so a soft-nav content swap can't cut it off.
+      // Shockwave: a ring that starts as the button's exact outline and expands
+      // by a CONSTANT offset on every side (box +2d, radius +d) so it stays
+      // equidistant from the button — a pill stays two half-circles joined by
+      // parallel lines instead of ballooning at the ends like a uniform scale
+      // would. Lives in the body-level .fx-layer so a soft-nav swap can't cut it.
       const r = btn.getBoundingClientRect();
       if (!r.width) return;
+      const R = effectiveRadius(btn, r); // the button's real corner radius (px)
+      const d = r.height * 0.7; // how far the ring travels outward
       const wave = document.createElement('span');
       wave.className = 'shockwave';
-      wave.style.cssText =
-        `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;` +
-        `border-radius:${getComputedStyle(btn).borderRadius}`;
+      wave.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:${R}px`;
       fxLayer().appendChild(wave);
-      wave.addEventListener('animationend', () => wave.remove());
+      const anim = wave.animate(
+        [
+          { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
+            borderRadius: `${R}px`, borderWidth: '3px', opacity: 0.85 },
+          { left: `${r.left - d}px`, top: `${r.top - d}px`, width: `${r.width + 2 * d}px`, height: `${r.height + 2 * d}px`,
+            borderRadius: `${R + d}px`, borderWidth: '0px', opacity: 0 },
+        ],
+        { duration: 550, easing: 'cubic-bezier(0.2, 0.6, 0.35, 1)' }
+      );
+      anim.finished.then(() => wave.remove(), () => wave.remove());
     });
   })();
 
