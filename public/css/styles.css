@@ -141,8 +141,29 @@ body.page-admin #main, body.page-deck-edit #main {
 .brand__logo { height: 34px; width: auto; display: block; filter: drop-shadow(var(--text-shadow)); }
 .brand-edit { display: inline-flex; gap: 0.3rem; }
 .site-nav a, .site-nav-drop a { color: var(--fg); font-weight: 600; text-shadow: var(--text-shadow); }
-.site-nav a { margin-left: 1.5rem; }
 .site-nav a:hover, .site-nav-drop a:hover { color: var(--accent-2); text-decoration: none; }
+/* Desktop nav links: on hover a white pill grows in behind the text — first a
+   circle scales up to the link height, then it widens to wrap the text. On
+   unhover the same runs in reverse (narrow to a circle, then shrink away). The
+   two phases are sequenced by giving the hover and resting states different
+   per-property transition delays. Spaced wide enough that pills never overlap. */
+.site-nav a {
+  position: relative; z-index: 0;
+  display: inline-flex; align-items: center; height: 2.4rem;
+  margin-left: 2.75rem; padding: 0 1.1rem; border-radius: var(--radius-pill);
+  transition: color 0.2s ease;
+}
+.site-nav a:hover, .site-nav a:focus-visible { text-shadow: none; }
+.site-nav a::before {
+  content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: 50%;
+  width: 2.4rem; transform: translateX(-50%) scale(0); transform-origin: center;
+  background: #fff; border-radius: var(--radius-pill);
+  transition: width 0.22s ease 0s, transform 0.2s ease 0.22s; /* reverse order */
+}
+.site-nav a:hover::before, .site-nav a:focus-visible::before {
+  width: 100%; transform: translateX(-50%) scale(1);
+  transition: transform 0.2s ease 0s, width 0.22s ease 0.2s; /* forward order */
+}
 /* The mobile dropdown lives outside the header (so its blur works); hidden until
    the compact layout opens it. */
 .site-nav-drop { display: none; }
