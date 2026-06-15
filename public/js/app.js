@@ -5,7 +5,7 @@
   // --- Click feedback: bounce + shape-matched shockwave on every button -----
   (function clickFeedback() {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const SELECTOR = 'button, a.btn, .site-nav a';
+    const SELECTOR = 'button, a.btn, .site-nav a, .brand';
     let layer = null;
     const fxLayer = () => (layer || (layer = document.body.appendChild(
       Object.assign(document.createElement('div'), { className: 'fx-layer' })

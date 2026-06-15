@@ -132,37 +132,51 @@ body.page-admin #main, body.page-deck-edit #main {
 .site-header .wrap { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .brand-group { display: flex; align-items: center; gap: 0.75rem; }
 .brand {
-  display: flex; align-items: center; gap: 0.6rem;
+  --pill-h: 2.9rem;
+  position: relative; z-index: 0;
+  display: inline-flex; align-items: center; gap: 0.6rem; height: var(--pill-h); padding: 0 0.95rem;
+  border-radius: var(--radius-pill);
   font-weight: 800; font-size: 1.25rem; color: var(--fg); letter-spacing: 0.5px;
   font-family: var(--font-heading); text-shadow: var(--text-shadow);
+  transition: color 0.2s ease;
 }
-.brand:hover { text-decoration: none; color: var(--accent-2); }
+/* On hover the white pill covers the brand, so flip the logo + text dark so they
+   stay legible (the white logo would otherwise vanish on the white pill). */
+.brand:hover, .brand:focus-visible { text-decoration: none; color: #16202b; text-shadow: none; }
+.brand:hover .brand__logo, .brand:focus-visible .brand__logo { filter: brightness(0); }
 /* Logo gets the same drop shadow as the brand text. */
-.brand__logo { height: 34px; width: auto; display: block; filter: drop-shadow(var(--text-shadow)); }
+.brand__logo { height: 34px; width: auto; display: block; filter: drop-shadow(var(--text-shadow)); transition: filter 0.2s ease; }
 .brand-edit { display: inline-flex; gap: 0.3rem; }
 .site-nav a, .site-nav-drop a { color: var(--fg); font-weight: 600; text-shadow: var(--text-shadow); }
 .site-nav a:hover, .site-nav-drop a:hover { color: var(--accent-2); text-decoration: none; }
-/* Desktop nav links: on hover a white pill grows in behind the text — first a
-   circle scales up to the link height, then it widens to wrap the text. On
-   unhover the same runs in reverse (narrow to a circle, then shrink away). The
-   two phases are sequenced by giving the hover and resting states different
-   per-property transition delays. Spaced wide enough that pills never overlap. */
+/* Grow-in white pill (desktop nav links + the brand). On hover a circle scales
+   up to the element height, then widens to wrap the contents; unhover runs it in
+   reverse. The two phases are sequenced via per-property transition timing, but
+   they OVERLAP and hand off at speed (scale accelerates out, width decelerates
+   in) so there's no dead-stop between the circle and the widen. Each element
+   sets its own --pill-h; the collapsed pill is a circle of that diameter. */
 .site-nav a {
+  --pill-h: 2.4rem; margin-left: 2.75rem;
   position: relative; z-index: 0;
-  display: inline-flex; align-items: center; height: 2.4rem;
-  margin-left: 2.75rem; padding: 0 1.1rem; border-radius: var(--radius-pill);
+  display: inline-flex; align-items: center; height: var(--pill-h);
+  padding: 0 1.1rem; border-radius: var(--radius-pill);
   transition: color 0.2s ease;
 }
 .site-nav a:hover, .site-nav a:focus-visible { text-shadow: none; }
-.site-nav a::before {
+.site-nav a::before, .brand::before {
   content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: 50%;
-  width: 2.4rem; transform: translateX(-50%) scale(0); transform-origin: center;
+  width: var(--pill-h); transform: translateX(-50%) scale(0); transform-origin: center;
   background: #fff; border-radius: var(--radius-pill);
-  transition: width 0.22s ease 0s, transform 0.2s ease 0.22s; /* reverse order */
+  /* reverse: width eases out first, scale follows once it's mostly narrowed */
+  transition: width 0.3s cubic-bezier(0.3, 0, 0.2, 1) 0s,
+              transform 0.22s cubic-bezier(0.5, 0, 0.4, 1) 0.16s;
 }
-.site-nav a:hover::before, .site-nav a:focus-visible::before {
+.site-nav a:hover::before, .site-nav a:focus-visible::before,
+.brand:hover::before, .brand:focus-visible::before {
   width: 100%; transform: translateX(-50%) scale(1);
-  transition: transform 0.2s ease 0s, width 0.22s ease 0.2s; /* forward order */
+  /* forward: scale accelerates out, width picks it up before scale settles */
+  transition: transform 0.22s cubic-bezier(0.5, 0, 0.7, 0.4) 0s,
+              width 0.34s cubic-bezier(0.2, 0.4, 0.2, 1) 0.13s;
 }
 /* The mobile dropdown lives outside the header (so its blur works); hidden until
    the compact layout opens it. */
