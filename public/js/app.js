@@ -60,13 +60,16 @@
       wave.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:${R}px`;
       fxLayer().appendChild(wave);
       const anim = wave.animate(
-        // Stays fully opaque the whole way — it fades out purely by the line
-        // thinning to nothing (border-width 3px → 0), not by going transparent.
+        // Stays fully opaque while the line thins (5px → 1px); only at the very
+        // end — once it's 1px and can't visibly get thinner — does it fade out.
+        // Geometry is on the 0/1 keyframes so it eases across the whole travel;
+        // border-width + opacity get an extra keyframe at 0.8 for the late fade.
         [
-          { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
-            borderRadius: `${R}px`, borderWidth: '3px' },
-          { left: `${r.left - d}px`, top: `${r.top - d}px`, width: `${r.width + 2 * d}px`, height: `${r.height + 2 * d}px`,
-            borderRadius: `${R + d}px`, borderWidth: '0px' },
+          { offset: 0, left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
+            borderRadius: `${R}px`, borderWidth: '5px', opacity: 1 },
+          { offset: 0.8, borderWidth: '1px', opacity: 1 },
+          { offset: 1, left: `${r.left - d}px`, top: `${r.top - d}px`, width: `${r.width + 2 * d}px`, height: `${r.height + 2 * d}px`,
+            borderRadius: `${R + d}px`, borderWidth: '1px', opacity: 0 },
         ],
         { duration: 550, easing: 'cubic-bezier(0.2, 0.6, 0.35, 1)' }
       );
