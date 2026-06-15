@@ -98,7 +98,7 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
    backdrop blur, a 50% screen-blend top rim, and a button-coloured drop shadow. */
 .site-header {
   position: fixed; top: 0; left: 0; right: 0; z-index: 30;
-  background: transparent;
+  background: transparent; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
   box-shadow: 0 8px 24px -10px var(--btn-shadow);
   /* Glass + blur extend up under the status bar / notch; the inner .wrap sits
      below the inset so the brand and menu stay clear of it. Fixed (not sticky)
@@ -111,28 +111,19 @@ body.page-games #main, body.page-about #main, body.page-press #main,
 body.page-admin #main, body.page-deck-edit #main {
   padding-top: calc(var(--header-h) + env(safe-area-inset-top));
 }
-/* The glass blur lives on a dedicated behind-content layer (not on .site-header
-   itself) so the header isn't a "backdrop root" — that lets the hamburger
-   dropdown, which is a descendant, run its OWN backdrop blur of the page. */
-.site-header__glass {
-  position: absolute; inset: 0; z-index: 0; pointer-events: none;
-  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-}
 /* Bottom rim light that fades out toward the left/right edges. */
 .site-header::before {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; z-index: 2; pointer-events: none;
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none;
   background: linear-gradient(to right, transparent 0%, var(--btn-highlight) 18%, var(--btn-highlight) 82%, transparent 100%);
   mix-blend-mode: screen; opacity: 0.5;
 }
-/* Multiply darkening in the shadow colour (saturation boosted), over the blur.
-   Non-negative z-indices throughout: backdrop-filter on the glass layer fails to
-   capture the page when it sits at a negative z-index. */
+/* Multiply darkening in the shadow colour (saturation boosted), behind the bar. */
 .site-header::after {
-  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: var(--btn-shadow); mix-blend-mode: multiply; opacity: 0.35;
   filter: saturate(2.5);
 }
-.site-header .wrap { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.site-header .wrap { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .brand-group { display: flex; align-items: center; gap: 0.75rem; }
 .brand {
   display: flex; align-items: center; gap: 0.6rem;
@@ -143,8 +134,12 @@ body.page-admin #main, body.page-deck-edit #main {
 /* Logo gets the same drop shadow as the brand text. */
 .brand__logo { height: 34px; width: auto; display: block; filter: drop-shadow(var(--text-shadow)); }
 .brand-edit { display: inline-flex; gap: 0.3rem; }
-.site-nav a { color: var(--fg); margin-left: 1.5rem; font-weight: 600; text-shadow: var(--text-shadow); }
-.site-nav a:hover { color: var(--accent-2); text-decoration: none; }
+.site-nav a, .site-nav-drop a { color: var(--fg); font-weight: 600; text-shadow: var(--text-shadow); }
+.site-nav a { margin-left: 1.5rem; }
+.site-nav a:hover, .site-nav-drop a:hover { color: var(--accent-2); text-decoration: none; }
+/* The mobile dropdown lives outside the header (so its blur works); hidden until
+   the compact layout opens it. */
+.site-nav-drop { display: none; }
 .nav-edit {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-pill);
   padding: 0.3rem 0.8rem; font-size: 0.85rem; text-shadow: none;
@@ -742,12 +737,16 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 /* Compact / vertical layout: collapse the nav into a hamburger, stack the hero
    panel over the (full-bleed, zoomed-out) art, and turn the divider horizontal. */
 @media (max-width: 820px) {
-  /* Nav collapses into a dropdown toggled by the hamburger. */
+  /* Desktop nav collapses; the hamburger reveals the dropdown instead. */
   .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
-  /* Frosted, rounded card matching the elevator-pitch box — but with the
-     screen-blend rim light on the BOTTOM edge instead of the top. */
-  .site-nav {
-    position: absolute; top: calc(100% + 0.4rem);
+  .site-nav { display: none; }
+  /* Frosted, rounded dropdown matching the elevator-pitch box — but with the
+     screen-blend rim light on the BOTTOM edge. It's fixed below the header and
+     OUTSIDE it in the DOM, so its backdrop-filter actually blurs the page (a
+     blur nested inside the blurred header would be isolated). */
+  .site-nav-drop {
+    position: fixed; z-index: 31;
+    top: calc(var(--header-h) + env(safe-area-inset-top) + 0.4rem);
     left: calc(0.75rem + env(safe-area-inset-left));
     right: calc(0.75rem + env(safe-area-inset-right));
     flex-direction: column; align-items: stretch;
@@ -759,19 +758,17 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
     -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
     border-radius: 28px;
     box-shadow: 0 20px 50px -10px var(--btn-shadow);
-    /* Collapsed by default; .is-open (set by app.js) reveals it. */
-    display: none;
+    /* Collapsed by default (base sets display:none); .is-open reveals it. */
   }
-  .site-nav.is-open { display: flex; }
-  .site-nav a { text-shadow: var(--text-shadow-strong); }
-  .site-nav::before {
+  .site-nav-drop.is-open { display: flex; }
+  .site-nav-drop::before {
     content: ""; position: absolute; inset: 0; border-radius: inherit;
     border-bottom: 2px solid var(--btn-highlight);
     mix-blend-mode: screen; pointer-events: none; opacity: 0.5;
   }
-  .site-nav a { margin-left: 0; padding: 0.85rem 1.5rem; position: relative; }
+  .site-nav-drop a { padding: 0.85rem 1.5rem; position: relative; text-shadow: var(--text-shadow-strong); }
   /* Divider between each option, fading out toward both ends. */
-  .site-nav a:not(:last-child)::after {
+  .site-nav-drop a:not(:last-child)::after {
     content: ""; position: absolute; left: 1.25rem; right: 1.25rem; bottom: 0; height: 2px;
     background: linear-gradient(to right, transparent, var(--btn-highlight), transparent);
     mix-blend-mode: screen; pointer-events: none; opacity: 0.5;

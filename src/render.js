@@ -100,6 +100,18 @@ export function layout({ title, body, editMode, extraHead = '', bodyClass = '' }
   const pageTitle = title ? `${escapeHtml(title)} — ${siteTitle}` : siteTitle;
   const theme = Site.theme();
   const siteLogo = getMedia(Site.siteLogoId());
+  // Shared nav links — used by the in-header desktop nav AND the mobile dropdown
+  // (the dropdown lives OUTSIDE the header so its backdrop-filter can blur the
+  // page; a backdrop-filter nested inside the blurred header is isolated).
+  const navLinks =
+    '<a href="/">Home</a>' +
+    '<a href="/games">Games</a>' +
+    '<a href="/about">About</a>' +
+    '<a href="/press">Press Kit</a>' +
+    (editMode
+      ? '<a class="nav-edit" href="/admin/submissions">Key requests</a>' +
+        '<a class="nav-edit nav-exit" href="/logout">Exit edit</a>'
+      : '');
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -124,7 +136,6 @@ ${extraHead}
 <body class="${bodyClass}${editMode ? ' is-edit' : ''}">
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site-header">
-  <div class="site-header__glass" aria-hidden="true"></div>
   <div class="wrap">
     <div class="brand-group">
       <a class="brand" href="/">
@@ -143,20 +154,10 @@ ${extraHead}
     <button type="button" class="nav-toggle" data-nav-toggle aria-label="Menu" aria-expanded="false" aria-controls="site-nav">
       <span class="nav-toggle__bars" aria-hidden="true"></span>
     </button>
-    <nav class="site-nav" id="site-nav" aria-label="Primary">
-      <a href="/">Home</a>
-      <a href="/games">Games</a>
-      <a href="/about">About</a>
-      <a href="/press">Press Kit</a>
-      ${
-        editMode
-          ? '<a class="nav-edit" href="/admin/submissions">Key requests</a>' +
-            '<a class="nav-edit nav-exit" href="/logout">Exit edit</a>'
-          : ''
-      }
-    </nav>
+    <nav class="site-nav" aria-label="Primary">${navLinks}</nav>
   </div>
 </header>
+<nav class="site-nav-drop" id="site-nav" aria-label="Menu">${navLinks}</nav>
 <main id="main">${body}</main>
 <footer class="site-footer">
   <div class="wrap">
