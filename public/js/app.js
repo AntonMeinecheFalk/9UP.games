@@ -182,6 +182,7 @@
 
       savedScrollY = window.scrollY || window.pageYOffset || 0; // restore exactly on close
       document.documentElement.style.overflow = 'hidden';       // lock background scroll
+      document.documentElement.classList.add('deck-open');      // slide the header up out of frame
       if (hero) hero.classList.add('is-deck-open');             // slide the hero panel down
       pop.hidden = false;
       void pop.offsetWidth;
@@ -232,6 +233,7 @@
       const controls = Array.from(_pop.querySelectorAll('.deck-pop__prev, .deck-pop__next, .deck-pop__close'));
       if (_hero) _hero.classList.remove('is-deck-open');
       _pop.classList.remove('is-open');
+      document.documentElement.classList.remove('deck-open'); // header slides back down
       document.documentElement.style.overflow = '';
       window.scrollTo(0, savedScrollY); // undo any scroll shift from the lock / focus
       const finish = () => {

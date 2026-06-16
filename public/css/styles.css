@@ -110,7 +110,11 @@ h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading
      below the inset so the brand and menu stay clear of it. Fixed (not sticky)
      so the hero can fill from the true top edge with no margin/env gymnastics. */
   padding-top: env(safe-area-inset-top);
+  transition: transform 0.45s cubic-bezier(0.5, 0, 0.7, 0.25);
 }
+/* While the pitch-deck popup is open, slide the header up out of frame so the
+   deck can use the full screen height. */
+html.deck-open .site-header { transform: translateY(-110%); }
 /* Pages without a hero: offset their content below the fixed header. Hero pages
    (home/game) deliberately let the hero run under the glass header. */
 body.page-games #main, body.page-about #main, body.page-press #main,
@@ -703,11 +707,11 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   --deck-gutter: 4.75rem; /* side space for the arrows */
   --deck-margin: 1.25rem; /* gap to the screen edges */
   --avail-w: calc(100vw - 2 * var(--deck-margin) - 2 * var(--deck-gutter));
-  --avail-h: calc(100dvh - var(--header-h) - env(safe-area-inset-top, 0px) - 2.25rem);
+  --avail-h: calc(100dvh - 2 * var(--deck-margin));
   position: fixed; inset: 0; z-index: 1200;
   display: flex; align-items: center; justify-content: center;
-  /* clear the fixed header at the top, keep margins on the other sides */
-  padding: calc(var(--header-h) + env(safe-area-inset-top, 0px) + 1rem) var(--deck-margin) var(--deck-margin);
+  /* full viewport — the header slides up out of frame while the deck is open */
+  padding: var(--deck-margin);
 }
 .deck-pop[hidden] { display: none; }
 /* Backdrop: blurs + darkens the page toward blue; fades in via .is-open. */
