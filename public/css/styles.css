@@ -358,8 +358,10 @@ body.page-admin #main, body.page-deck-edit #main {
   -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
   /* cast shadow inherits the button shadow colour */
   box-shadow: var(--shadow-panel);
-  /* slides down out of frame when the pitch-deck popup opens */
-  transition: transform 0.45s cubic-bezier(0.5, 0, 0.7, 0.25), opacity 0.4s ease;
+  /* Resting/return transition (used when the popup closes): ease-OUT so the panel
+     decelerates and settles instead of stopping abruptly. The slide-OUT on open
+     uses its own ease-in below. */
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
 }
 /* top-only rim light, same screen-blended highlight colour as the buttons */
 .hero__panel::before {
@@ -710,8 +712,12 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 /* ============================================================================
    Pitch deck — in-page popup (opens over the hero; no navigation)
    ========================================================================= */
-/* The bottom hero panel slides down out of frame as the popup opens. */
-.hero.is-deck-open .hero__panel { transform: translateY(135%); opacity: 0; pointer-events: none; }
+/* The bottom hero panel slides down out of frame as the popup opens — ease-IN
+   (accelerate away). The slide back in (resting state) eases out, see .hero__panel. */
+.hero.is-deck-open .hero__panel {
+  transform: translateY(135%); opacity: 0; pointer-events: none;
+  transition: transform 0.45s cubic-bezier(0.5, 0, 0.7, 0.25), opacity 0.4s ease;
+}
 
 .deck-pop {
   --deck-gutter: 4.75rem; /* side space for the arrows */
