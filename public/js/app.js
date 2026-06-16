@@ -179,6 +179,10 @@
       idx = Math.max(0, slides.findIndex((s) => s.classList.contains('is-active')));
       const card = pop.querySelector('[data-deck-card]');
       const controls = Array.from(pop.querySelectorAll('.deck-pop__prev, .deck-pop__next, .deck-pop__close'));
+      // Clear any leftover (fill:both) animations from a previous open/close, or
+      // their held end-states would re-assert (e.g. the close fade-out's opacity:0
+      // would reappear and hide the controls after the slide-in is cancelled).
+      [card, ...controls].forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
 
       savedScrollY = window.scrollY || window.pageYOffset || 0; // restore exactly on close
       document.documentElement.style.overflow = 'hidden';       // lock background scroll
@@ -238,8 +242,11 @@
       window.scrollTo(0, savedScrollY); // undo any scroll shift from the lock / focus
       const finish = () => {
         _pop.hidden = true;
+        // Cancel the fade-out (fill:both) animations so they don't linger and
+        // re-assert opacity:0 on the next open.
+        card.getAnimations().forEach((a) => a.cancel());
         card.style.transform = '';
-        controls.forEach((a) => { a.style.opacity = ''; a.style.transform = ''; });
+        controls.forEach((a) => { a.getAnimations().forEach((an) => an.cancel()); a.style.opacity = ''; a.style.transform = ''; });
       };
       if (reduceMotion) {
         finish();
