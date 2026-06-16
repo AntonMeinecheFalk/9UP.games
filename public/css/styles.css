@@ -745,8 +745,9 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 .deck-pop__loader {
   position: absolute; inset: 0; z-index: 5;
   display: flex; align-items: center; justify-content: center;
-  background: var(--bg);
-  transition: opacity 0.35s ease 0.28s; /* blue fades AFTER the logo has flown up */
+  /* same accent gradient as the Pitch Deck / Steam Page buttons */
+  background: linear-gradient(to top, var(--accent) 0%, var(--accent-2) 100%);
+  transition: opacity 0.35s ease 0.28s; /* fades AFTER the logo has flown up */
 }
 .deck-pop__loader.is-done { opacity: 0; pointer-events: none; }
 .deck-pop__loaderlogo {
