@@ -755,7 +755,9 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   transform: scale(0); /* closed; app.js animates the bounce-in */
 }
 .deck-pop__card::before {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 4; pointer-events: none;
+  /* z above the wipe layers (entering slide z5, white line z6) so the top-rim
+     highlight stays put during a slide wipe. */
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 7; pointer-events: none;
   border-top: 2px solid var(--btn-highlight); mix-blend-mode: screen; opacity: 0.5;
 }
 .deck-pop__stage { position: absolute; inset: 0; overflow: hidden; }
@@ -873,11 +875,12 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none; opacity: 0;
 }
 .deck-pop__stage.is-wiping::after { opacity: 1; }
+/* Wider, hard-edged (no feather) white line. */
 .deck-pop__stage.is-wiping.wipe-next::after {
-  background: linear-gradient(260deg, transparent calc(var(--wipe) - 1.1%), #fff calc(var(--wipe) - 0.35%), #fff calc(var(--wipe) + 0.35%), transparent calc(var(--wipe) + 1.1%));
+  background: linear-gradient(260deg, transparent calc(var(--wipe) - 0.9%), #fff calc(var(--wipe) - 0.9%), #fff calc(var(--wipe) + 0.9%), transparent calc(var(--wipe) + 0.9%));
 }
 .deck-pop__stage.is-wiping.wipe-prev::after {
-  background: linear-gradient(100deg, transparent calc(var(--wipe) - 1.1%), #fff calc(var(--wipe) - 0.35%), #fff calc(var(--wipe) + 0.35%), transparent calc(var(--wipe) + 1.1%));
+  background: linear-gradient(100deg, transparent calc(var(--wipe) - 0.9%), #fff calc(var(--wipe) - 0.9%), #fff calc(var(--wipe) + 0.9%), transparent calc(var(--wipe) + 0.9%));
 }
 /* Every block fills the whole slide and they LAYER back-to-front in DOM order
    (first = back, last = front) instead of stacking vertically. Block containers
