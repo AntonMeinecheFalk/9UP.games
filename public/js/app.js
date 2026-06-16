@@ -95,6 +95,30 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
   })();
 
+  // --- Desktop nav-link wobble ----------------------------------------------
+  // Rotation-only wobble on hover/focus, driven in JS so its AMPLITUDE can lerp
+  // smoothly in AND out (CSS can't ease out of a removed keyframe animation). The
+  // grow + pill highlight are CSS; the header persists, so this wires once.
+  (function navWobble() {
+    if (reduceMotion) return;
+    const PERIOD = 2100, MAX = 2; // ms per cycle, peak degrees
+    document.querySelectorAll('.site-nav a').forEach((link) => {
+      let amp = 0, target = 0, raf = null;
+      const tick = () => {
+        amp += (target - amp) * 0.12; // ease amplitude toward target (0 or 1)
+        if (target === 0 && amp < 0.005) { link.style.rotate = ''; raf = null; return; }
+        const phase = (performance.now() % PERIOD) / PERIOD * Math.PI * 2;
+        link.style.rotate = (amp * MAX * Math.sin(phase)).toFixed(3) + 'deg';
+        raf = requestAnimationFrame(tick);
+      };
+      const set = (t) => { target = t; if (raf == null) raf = requestAnimationFrame(tick); };
+      link.addEventListener('mouseenter', () => set(1));
+      link.addEventListener('mouseleave', () => set(0));
+      link.addEventListener('focus', () => set(1));
+      link.addEventListener('blur', () => set(0));
+    });
+  })();
+
   // --- Custom scroll-position indicator (replaces the hidden native bar) -----
   (function scrollIndicator() {
     const el = document.createElement('div');
