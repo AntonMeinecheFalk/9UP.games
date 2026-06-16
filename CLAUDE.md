@@ -23,7 +23,7 @@ together, the design conventions, and how it's deployed.
 - `src/media.js` — upload pipeline (multer + sharp), serving paths.
 - `public/css/styles.css` — the entire design system (one file).
 - `public/js/` — `app.js` (public: carousels, press flow, **hamburger nav**, **hero parallax**,
-  **click feedback**, **soft nav**), `edit.js` (edit mode), `deck.js`/`deck-edit.js`.
+  **click feedback**, **soft nav**, **deck popup**), `edit.js` (edit mode), `deck.js`/`deck-edit.js`.
   - `app.js` splits into **global widgets** wired once (click feedback, nav toggle, scroll indicator —
     they live on the persistent header/body) and **per-page widgets** (`initContent()`: carousels,
     games carousel, hero parallax, press flow). `initContent()` re-runs after every soft-nav swap; any
@@ -61,6 +61,16 @@ A wrong secret returns a plain 404.
   out of a white disc (the `--arrow-hole` mask). Size via `--arrow-size`/`--tri-size`, direction via
   `--prev`/`--next`. Markup adds `glass-arrow glass-arrow--prev/next` + a context class for position
   (`carousel__prev/next`, `deck-arrow`). The triangle SVG comes from `triSvg()` exported by `render.js`.
+- **Pitch-deck popup** (`render.js` → `renderDeckPopup`, `app.js` → `deckPopup`): in public mode the
+  hero's "Pitch Deck" button opens the deck **in-page** as a lightbox instead of navigating (the
+  `/…/deck` href stays as a no-JS/crawler fallback; `data-deck-open` flags the button). Slides are
+  pre-rendered hidden into the page (`Slides.forGame` passed through `renderHero`) and reuse the
+  viewer's `.deck-slide`/`.slide-block` layout classes inside a glass card styled like the image
+  carousel. Open choreography (WAAPI, sequenced): the hero `.hero__panel` slides down (`.is-deck-open`)
+  + a blurred/blue-darkened backdrop fades in, **then** the card bounce-grows from center, and once it's
+  full-size the gutter arrows slide out from behind its edges with their own bounce. Esc/backdrop/✕
+  close it (reverses). Only rendered when the game has ≥1 slide; not in edit mode (there the button
+  still navigates to the deck editor).
 - **Click feedback** (`app.js` → `clickFeedback`): a global `pointerdown` handler on `button, a.btn`
   plays a press bounce (Web-Animations on the `scale` property, so it composes with hover/float
   transforms) and spawns a `.shockwave` ring into a `.fx-layer` overlay, sized to the button and given

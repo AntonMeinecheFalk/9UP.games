@@ -152,6 +152,126 @@
     update();
   })();
 
+  // --- Pitch-deck popup -----------------------------------------------------
+  // Open the deck in-page (over the hero) instead of navigating. Delegated, so
+  // it keeps working for the popup markup swapped in by soft-nav. Sequence:
+  // the hero panel slides down + the backdrop blurs/darkens, THEN the glass card
+  // bounce-grows from the centre, and once it's full-size the arrows slide out
+  // from behind its edges with their own bounce.
+  (function deckPopup() {
+    let isOpen = false, pop = null, hero = null, opener = null;
+    let slides = [], idx = 0;
+
+    const showSlide = (n) => {
+      if (!slides.length) return;
+      slides[idx] && slides[idx].classList.remove('is-active');
+      idx = (n + slides.length) % slides.length;
+      slides[idx].classList.add('is-active');
+    };
+
+    function open(btn) {
+      pop = document.querySelector('[data-deck-pop]');
+      if (!pop || isOpen) return;
+      isOpen = true;
+      opener = btn;
+      hero = btn.closest('.hero');
+      slides = Array.from(pop.querySelectorAll('.deck-slide'));
+      idx = Math.max(0, slides.findIndex((s) => s.classList.contains('is-active')));
+      const card = pop.querySelector('[data-deck-card]');
+      const arrows = Array.from(pop.querySelectorAll('.deck-pop__prev, .deck-pop__next'));
+
+      document.documentElement.style.overflow = 'hidden'; // lock background scroll
+      if (hero) hero.classList.add('is-deck-open');        // slide the hero panel down
+      pop.hidden = false;
+      void pop.offsetWidth;
+      pop.classList.add('is-open');                         // fade the backdrop in (CSS)
+
+      if (reduceMotion) {
+        card.style.transform = 'scale(1)';
+      } else {
+        arrows.forEach((a) => { a.style.opacity = '0'; });  // hidden until the card lands
+        const grow = card.animate(
+          [
+            { transform: 'scale(0)', opacity: 0, offset: 0 },
+            { transform: 'scale(1.06)', opacity: 1, offset: 0.72 },
+            { transform: 'scale(0.985)', offset: 0.87 },
+            { transform: 'scale(1)', offset: 1 },
+          ],
+          { duration: 540, delay: 200, easing: 'cubic-bezier(0.25, 0.6, 0.3, 1)', fill: 'both' }
+        );
+        grow.onfinish = () => {
+          card.style.transform = 'scale(1)';
+          grow.cancel();
+          arrows.forEach((a) => {
+            const dir = a.classList.contains('deck-pop__prev') ? 1 : -1; // start tucked toward the card
+            a.style.opacity = '';
+            const out = a.animate(
+              [
+                { transform: `translateY(-50%) translateX(${dir * 70}px) scale(0.5)`, opacity: 0 },
+                { transform: 'translateY(-50%) translateX(0) scale(1)', opacity: 1 },
+              ],
+              { duration: 440, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', fill: 'both' }
+            );
+            out.onfinish = () => { a.style.transform = ''; out.cancel(); };
+          });
+        };
+      }
+      const frame = pop.querySelector('.deck-pop__frame');
+      if (frame) frame.focus();
+    }
+
+    function close() {
+      if (!isOpen || !pop) return;
+      isOpen = false;
+      const _pop = pop, _hero = hero, _opener = opener;
+      const card = _pop.querySelector('[data-deck-card]');
+      const arrows = Array.from(_pop.querySelectorAll('.deck-pop__prev, .deck-pop__next'));
+      if (_hero) _hero.classList.remove('is-deck-open');
+      _pop.classList.remove('is-open');
+      document.documentElement.style.overflow = '';
+      const finish = () => {
+        _pop.hidden = true;
+        card.style.transform = '';
+        arrows.forEach((a) => { a.style.opacity = ''; a.style.transform = ''; });
+      };
+      if (reduceMotion) {
+        finish();
+      } else {
+        arrows.forEach((a) => a.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'both' }));
+        const shrink = card.animate(
+          [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(0.1)', opacity: 0 }],
+          { duration: 280, easing: 'cubic-bezier(0.5, 0, 0.75, 0.2)', fill: 'both' }
+        );
+        shrink.onfinish = () => { shrink.cancel(); finish(); };
+      }
+      if (_opener && _opener.focus) _opener.focus();
+      pop = null; hero = null; opener = null;
+    }
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-deck-open]');
+      if (btn) { e.preventDefault(); open(btn); return; }
+      if (!isOpen) return;
+      if (e.target.closest('[data-deck-close]')) { e.preventDefault(); close(); return; }
+      if (e.target.closest('[data-deck-prev]')) { showSlide(idx - 1); return; }
+      if (e.target.closest('[data-deck-next]')) { showSlide(idx + 1); return; }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!isOpen) return;
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowRight') showSlide(idx + 1);
+      else if (e.key === 'ArrowLeft') showSlide(idx - 1);
+    });
+    let sx = null;
+    document.addEventListener('touchstart', (e) => { if (isOpen) sx = e.touches[0].clientX; }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+      if (!isOpen || sx == null) return;
+      const dx = e.changedTouches[0].clientX - sx;
+      if (Math.abs(dx) > 50) showSlide(dx < 0 ? idx + 1 : idx - 1);
+      sx = null;
+    });
+  })();
+
   // ======================================================================
   // PER-PAGE widgets — re-run after every soft-nav content swap. Widgets
   // that attach window-level listeners register a teardown so they don't

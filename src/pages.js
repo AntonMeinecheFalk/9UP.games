@@ -8,7 +8,7 @@ import {
   addSectionMenu,
 } from './render.js';
 import { escapeHtml } from './sanitize.js';
-import { Games, Sections, Team, Site } from './models.js';
+import { Games, Sections, Team, Site, Slides } from './models.js';
 
 // --- Landing page -----------------------------------------------------------
 export function renderHome(editMode) {
@@ -50,7 +50,7 @@ export function renderHome(editMode) {
     return layout({ title: null, body, editMode, bodyClass: 'page-home' });
   }
 
-  body += renderHero(featured, editMode);
+  body += renderHero(featured, editMode, Slides.forGame(featured.id));
   body += featuredToolbar;
   body += `<div class="wrap sections" data-sections-owner="game" data-owner-id="${featured.id}">`;
   for (const section of Sections.list('game', featured.id)) {
@@ -86,7 +86,7 @@ export function renderHome(editMode) {
 
 // --- A standalone game page (for non-featured games) ------------------------
 export function renderGamePage(game, editMode) {
-  let body = renderHero(game, editMode);
+  let body = renderHero(game, editMode, Slides.forGame(game.id));
   body += `<div class="wrap sections" data-sections-owner="game" data-owner-id="${game.id}">`;
   for (const section of Sections.list('game', game.id)) {
     body += renderSection(section, editMode);

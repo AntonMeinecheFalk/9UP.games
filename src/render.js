@@ -222,12 +222,15 @@ function themePanel(theme) {
 }
 
 // --- hero --------------------------------------------------------------------
-export function renderHero(game, editMode) {
+export function renderHero(game, editMode, slides = []) {
   if (!game) return '';
   const hero = getMedia(game.hero_media);
   const logo = getMedia(game.logo_media);
   const d = parseDisplay(game.display);
   const steam = safeUrl(game.steam_url);
+  // In public mode, the "Pitch Deck" button opens an in-page popup (below)
+  // instead of navigating; the href stays as a no-JS / crawler fallback.
+  const showDeckPopup = !editMode && slides.length > 0;
 
   // Hero image is a real <img> (object-fit: cover) so object-position controls
   // crop/focus and a scale transform controls zoom.
@@ -278,7 +281,9 @@ export function renderHero(game, editMode) {
           ${logoHtml}
           <h1 class="${titleClass}">${escapeHtml(game.title)}</h1>
           <div class="hero__buttons">
-            <a class="btn btn--primary" href="/game/${escapeHtml(game.slug)}/deck">Pitch Deck</a>
+            <a class="btn btn--primary" href="/game/${escapeHtml(game.slug)}/deck"${
+              showDeckPopup ? ' data-deck-open' : ''
+            }>Pitch Deck</a>
             ${
               steam
                 ? `<a class="btn btn--secondary" href="${escapeHtml(steam)}" target="_blank" rel="noopener">Steam Page</a>`
@@ -346,7 +351,45 @@ export function renderHero(game, editMode) {
          </div>`
       : ''
   }
-</section>`;
+</section>${showDeckPopup ? renderDeckPopup(game, slides) : ''}`;
+}
+
+// --- pitch-deck popup (in-page) ---------------------------------------------
+// A lightbox version of the deck: a glass card (styled like the image-carousel
+// frame) holding the slides, with the shared glass arrows in the side gutters.
+// app.js choreographs the open animation and slide navigation; this is just the
+// hidden markup. Slides reuse the viewer's .deck-slide layout classes.
+export function renderDeckPopup(game, slides) {
+  const slidesHtml = slides
+    .map((s, i) => {
+      const firstImg = s.data.blocks.find((b) => b.type === 'image' && b.mediaId);
+      const bgMedia = firstImg ? getMedia(firstImg.mediaId) : null;
+      const bg = bgMedia
+        ? `<img class="deck-slide__bg" src="${escapeHtml(mediaUrl(bgMedia))}" alt="" aria-hidden="true">`
+        : '';
+      return `<section class="deck-slide ${i === 0 ? 'is-active' : ''}" data-slide-index="${i}">
+          ${bg}
+          <div class="deck-slide__inner">${s.data.blocks.map(renderSlideBlock).join('')}</div>
+        </section>`;
+    })
+    .join('');
+  const arrows =
+    slides.length > 1
+      ? `<button type="button" class="glass-arrow glass-arrow--prev deck-pop__prev" data-deck-prev aria-label="Previous slide">${triSvg()}</button>
+         <button type="button" class="glass-arrow glass-arrow--next deck-pop__next" data-deck-next aria-label="Next slide">${triSvg()}</button>`
+      : '';
+  return `<div class="deck-pop" data-deck-pop hidden>
+    <div class="deck-pop__backdrop" data-deck-close></div>
+    <div class="deck-pop__frame" role="dialog" aria-modal="true" aria-label="${escapeHtml(
+      game.title
+    )} — pitch deck" tabindex="-1">
+      <div class="deck-pop__card" data-deck-card>
+        <div class="deck-pop__stage">${slidesHtml}</div>
+        <button type="button" class="deck-pop__close" data-deck-close aria-label="Close pitch deck">✕</button>
+      </div>
+      ${arrows}
+    </div>
+  </div>`;
 }
 
 // --- games catalogue carousel -----------------------------------------------

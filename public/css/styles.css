@@ -344,6 +344,8 @@ body.page-admin #main, body.page-deck-edit #main {
   -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
   /* cast shadow inherits the button shadow colour */
   box-shadow: var(--shadow-panel);
+  /* slides down out of frame when the pitch-deck popup opens */
+  transition: transform 0.45s cubic-bezier(0.5, 0, 0.7, 0.25), opacity 0.4s ease;
 }
 /* top-only rim light, same screen-blended highlight colour as the buttons */
 .hero__panel::before {
@@ -690,6 +692,55 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .data-table th, .data-table td { border: 1px solid var(--border); padding: 0.6rem; text-align: left; vertical-align: top; }
 .data-table th { background: var(--bg-elev); }
+
+/* ============================================================================
+   Pitch deck — in-page popup (opens over the hero; no navigation)
+   ========================================================================= */
+/* The bottom hero panel slides down out of frame as the popup opens. */
+.hero.is-deck-open .hero__panel { transform: translateY(135%); opacity: 0; pointer-events: none; }
+
+.deck-pop { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; }
+.deck-pop[hidden] { display: none; }
+/* Backdrop: blurs + darkens the page toward blue; fades in via .is-open. */
+.deck-pop__backdrop {
+  position: absolute; inset: 0; cursor: zoom-out; opacity: 0;
+  background: rgba(7, 28, 56, 0.66);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  transition: opacity 0.4s ease;
+}
+.deck-pop.is-open .deck-pop__backdrop { opacity: 1; }
+/* Frame holds the card plus the arrows that live in the side gutters. */
+.deck-pop__frame { position: relative; z-index: 1; width: min(92vw, 1060px); padding-inline: 4.5rem; outline: none; }
+/* The card = the glass rounded box, same treatment as the image-carousel frame. */
+.deck-pop__card {
+  position: relative; z-index: 3; aspect-ratio: 16 / 9; overflow: hidden;
+  border-radius: 20px; background: var(--bg-elev); box-shadow: var(--shadow-panel);
+  transform: scale(0); /* closed; app.js animates the bounce-in */
+}
+.deck-pop__card::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 4; pointer-events: none;
+  border-top: 2px solid var(--btn-highlight); mix-blend-mode: screen; opacity: 0.5;
+}
+.deck-pop__stage { position: absolute; inset: 0; overflow: hidden; }
+/* Slides reuse .deck-slide / .deck-slide__inner / .slide-block from the viewer. */
+.deck-pop__close {
+  position: absolute; top: 0.7rem; right: 0.7rem; z-index: 6;
+  width: 40px; height: 40px; border: none; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.14); -webkit-backdrop-filter: var(--blur-md); backdrop-filter: var(--blur-md);
+  color: #fff; font-size: 1.05rem; transition: background 0.2s ease;
+}
+.deck-pop__close:hover { background: rgba(255, 255, 255, 0.3); }
+/* Arrows: the shared glass arrow in the gutters just outside the card, sitting
+   BEHIND it (lower z) so they can slide out from under its edges. */
+.deck-pop__prev, .deck-pop__next { --arrow-size: 60px; --tri-size: 26px; z-index: 2; }
+.deck-pop__prev { left: 0; }
+.deck-pop__next { right: 0; }
+@media (max-width: 820px) {
+  .deck-pop__frame { width: 94vw; padding-inline: 0; }
+  .deck-pop__prev { left: 0.5rem; }
+  .deck-pop__next { right: 0.5rem; }
+}
 
 /* ============================================================================
    Pitch deck — viewer
