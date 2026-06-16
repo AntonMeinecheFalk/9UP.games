@@ -178,7 +178,10 @@
       slides = Array.from(pop.querySelectorAll('.deck-slide'));
       idx = Math.max(0, slides.findIndex((s) => s.classList.contains('is-active')));
       const card = pop.querySelector('[data-deck-card]');
-      const controls = Array.from(pop.querySelectorAll('.deck-pop__prev, .deck-pop__next, .deck-pop__close'));
+      const closeBtn = pop.querySelector('.deck-pop__close');
+      const arrows = Array.from(pop.querySelectorAll('.deck-pop__prev, .deck-pop__next'));
+      const controls = [closeBtn, ...arrows].filter(Boolean);
+      const loader = pop.querySelector('[data-deck-loader]');
       // Clear any leftover (fill:both) animations from a previous open/close, or
       // their held end-states would re-assert (e.g. the close fade-out's opacity:0
       // would reappear and hide the controls after the slide-in is cancelled).
@@ -188,14 +191,47 @@
       document.documentElement.style.overflow = 'hidden';       // lock background scroll
       document.documentElement.classList.add('deck-open');      // slide the header up out of frame
       if (hero) hero.classList.add('is-deck-open');             // slide the hero panel down
+      if (loader) loader.classList.remove('is-done');           // show the blue + bobbing-logo loader
       pop.hidden = false;
       void pop.offsetWidth;
       pop.classList.add('is-open');                             // fade the backdrop in (CSS)
 
+      // Decode every slide image up front so paging through them never hitches.
+      // Race a 5s safety cap so a slow/stuck decode can never trap the loader.
+      const imgs = Array.from(pop.querySelectorAll('.deck-slide img'));
+      const decoded = Promise.all(imgs.map((im) => (im.decode ? im.decode().catch(() => {}) : Promise.resolve())));
+      const preloaded = Promise.race([decoded, new Promise((res) => setTimeout(res, 5000))]);
+      const reveal = () => { if (loader) loader.classList.add('is-done'); }; // logo flies up, blue fades
+
+      // Bounce a single control out from behind the card edge. Landscape/desktop:
+      // arrows from the sides, close from the top-right. Portrait: arrows up from
+      // below, close down from above (the stacked layout — see the portrait media query).
+      const portrait = window.matchMedia('(max-width: 820px) and (orientation: portrait)').matches;
+      const slideIn = (a) => {
+        const isClose = a.classList.contains('deck-pop__close');
+        let from, to;
+        if (portrait) {
+          from = isClose ? 'translateY(34px) scale(0.4)' : 'translateY(-34px) scale(0.5)';
+          to = 'translateY(0) scale(1)';
+        } else {
+          from = isClose
+            ? 'translate(-22px, 56px) scale(0.4)'
+            : `translateY(-50%) translateX(${a.classList.contains('deck-pop__prev') ? 70 : -70}px) scale(0.5)`;
+          to = isClose ? 'translate(0, 0) scale(1)' : 'translateY(-50%) translateX(0) scale(1)';
+        }
+        a.style.opacity = '';
+        const out = a.animate(
+          [{ transform: from, opacity: 0 }, { transform: to, opacity: 1 }],
+          { duration: 440, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', fill: 'both' }
+        );
+        out.onfinish = () => { a.style.transform = ''; out.cancel(); };
+      };
+
       if (reduceMotion) {
         card.style.transform = 'scale(1)';
+        preloaded.finally(reveal);
       } else {
-        controls.forEach((a) => { a.style.opacity = '0'; });    // hidden until the card lands
+        controls.forEach((a) => { a.style.opacity = '0'; });    // hidden until their turn
         const grow = card.animate(
           [
             { transform: 'scale(0)', opacity: 0, offset: 0 },
@@ -205,34 +241,16 @@
           ],
           { duration: 540, delay: 200, easing: 'cubic-bezier(0.25, 0.6, 0.3, 1)', fill: 'both' }
         );
-        grow.onfinish = () => {
-          card.style.transform = 'scale(1)';
-          grow.cancel();
-          // controls slide out from behind the card's edges, with a bounce settle.
-          // Landscape/desktop: arrows horizontally from the sides, close from the
-          // top-right. Portrait: arrows up from below the card, close down from
-          // above (the stacked layout — see the CSS portrait media query).
-          const portrait = window.matchMedia('(max-width: 820px) and (orientation: portrait)').matches;
-          controls.forEach((a) => {
-            const isClose = a.classList.contains('deck-pop__close');
-            let from, to;
-            if (portrait) {
-              from = isClose ? 'translateY(34px) scale(0.4)' : 'translateY(-34px) scale(0.5)';
-              to = 'translateY(0) scale(1)';
-            } else {
-              from = isClose
-                ? 'translate(-22px, 56px) scale(0.4)'
-                : `translateY(-50%) translateX(${a.classList.contains('deck-pop__prev') ? 70 : -70}px) scale(0.5)`;
-              to = isClose ? 'translate(0, 0) scale(1)' : 'translateY(-50%) translateX(0) scale(1)';
-            }
-            a.style.opacity = '';
-            const out = a.animate(
-              [{ transform: from, opacity: 0 }, { transform: to, opacity: 1 }],
-              { duration: 440, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', fill: 'both' }
-            );
-            out.onfinish = () => { a.style.transform = ''; out.cancel(); };
-          });
-        };
+        const grown = grow.finished.then(() => { card.style.transform = 'scale(1)'; grow.cancel(); }).catch(() => {});
+        // The X pops as soon as the card lands — it doesn't wait for the preload.
+        grown.then(() => { if (isOpen && closeBtn) slideIn(closeBtn); });
+        // The arrows wait until the card is up AND every slide is decoded; then the
+        // loader reveals the deck and the arrows bounce out (so paging is hitch-free).
+        Promise.all([grown, preloaded]).then(() => {
+          if (!isOpen) return;
+          reveal();
+          arrows.forEach(slideIn);
+        });
       }
       const frame = pop.querySelector('.deck-pop__frame');
       if (frame) frame.focus({ preventScroll: true });

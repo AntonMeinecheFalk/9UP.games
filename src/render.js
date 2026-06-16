@@ -360,6 +360,7 @@ export function renderHero(game, editMode, slides = []) {
 // app.js choreographs the open animation and slide navigation; this is just the
 // hidden markup. Slides reuse the viewer's .deck-slide layout classes.
 export function renderDeckPopup(game, slides) {
+  const siteLogo = getMedia(Site.siteLogoId());
   const slidesHtml = slides
     .map((s, i) => {
       const firstImg = s.data.blocks.find((b) => b.type === 'image' && b.mediaId);
@@ -385,6 +386,9 @@ export function renderDeckPopup(game, slides) {
     )} — pitch deck" tabindex="-1">
       <div class="deck-pop__card" data-deck-card>
         <div class="deck-pop__stage">${slidesHtml}</div>
+        <div class="deck-pop__loader" data-deck-loader aria-hidden="true">${
+          siteLogo ? `<img class="deck-pop__loaderlogo" src="${escapeHtml(mediaUrl(siteLogo))}" alt="">` : ''
+        }</div>
       </div>
       ${arrows}
       <button type="button" class="glass-arrow deck-pop__close" data-deck-close aria-label="Close pitch deck"><svg class="glass-arrow__tri deck-pop__x" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6 L18 18 M18 6 L6 18"/></svg></button>

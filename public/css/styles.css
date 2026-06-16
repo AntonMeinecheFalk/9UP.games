@@ -739,6 +739,33 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   border-top: 2px solid var(--btn-highlight); mix-blend-mode: screen; opacity: 0.5;
 }
 .deck-pop__stage { position: absolute; inset: 0; overflow: hidden; }
+/* Loading cover: solid site-blue with the company logo bobbing in the centre
+   while every slide is decoded. When done, the logo flies up + fades, then the
+   blue fades (delayed) to reveal the deck. */
+.deck-pop__loader {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  transition: opacity 0.35s ease 0.28s; /* blue fades AFTER the logo has flown up */
+}
+.deck-pop__loader.is-done { opacity: 0; pointer-events: none; }
+.deck-pop__loaderlogo {
+  width: min(34%, 200px); height: auto;
+  /* Reuse the button-hover float (bob + wobble); the cast shadow softens + recedes
+     as the logo rises and sharpens as it drops (synced to the same 3s cycle). */
+  animation: btnFloatY 3s ease-in-out infinite, btnFloatRot 3s ease-in-out infinite,
+             deckLogoShadow 3s ease-in-out infinite;
+  transition: transform 0.3s cubic-bezier(0.45, 0, 0.6, 0.2), opacity 0.28s ease;
+}
+.deck-pop__loader.is-done .deck-pop__loaderlogo { transform: translateY(-150px); opacity: 0; }
+@keyframes deckLogoShadow {
+  0%, 100% { filter: drop-shadow(0 3px 3px var(--btn-shadow)); }  /* low: sharp */
+  50%      { filter: drop-shadow(0 16px 17px var(--btn-shadow)); } /* high: soft + far */
+}
+@media (prefers-reduced-motion: reduce) {
+  .deck-pop__loaderlogo { animation: none; }
+  .deck-pop__loader, .deck-pop__loaderlogo { transition: none; }
+}
 /* Slides reuse .deck-slide / .deck-slide__inner / .slide-block from the viewer. */
 /* Close = a glass arrow too: a frosted disc just outside the card's top-right
    corner. It slides out with the arrows, and on hover the disc turns white with

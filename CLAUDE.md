@@ -71,6 +71,10 @@ A wrong secret returns a plain 404.
   full-size the gutter arrows slide out from behind its edges with their own bounce. Esc/backdrop/✕
   close it (reverses). Only rendered when the game has ≥1 slide; not in edit mode (there the button
   still navigates to the deck editor).
+  - **Preloader:** on open, a blue (`--bg`) cover with the site logo bobbing (reuses `btnFloatY`/
+    `btnFloatRot` + a synced `deckLogoShadow`) shows while every slide image is `decode()`d (so paging
+    never hitches). The X pops as soon as the card lands; the **arrows wait** for the decode (5s safety
+    cap) — then the logo flies up + fades, the blue fades, and the arrows bounce out.
 - **Click feedback** (`app.js` → `clickFeedback`): a global `pointerdown` handler on `button, a.btn`
   plays a press bounce (Web-Animations on the `scale` property, so it composes with hover/float
   transforms) and spawns a `.shockwave` ring into a `.fx-layer` overlay, sized to the button and given
