@@ -385,9 +385,9 @@ export function renderDeckPopup(game, slides) {
     )} — pitch deck" tabindex="-1">
       <div class="deck-pop__card" data-deck-card>
         <div class="deck-pop__stage">${slidesHtml}</div>
-        <button type="button" class="deck-pop__close" data-deck-close aria-label="Close pitch deck">✕</button>
       </div>
       ${arrows}
+      <button type="button" class="glass-arrow deck-pop__close" data-deck-close aria-label="Close pitch deck"><svg class="glass-arrow__tri deck-pop__x" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6 L18 18 M18 6 L6 18"/></svg></button>
     </div>
   </div>`;
 }

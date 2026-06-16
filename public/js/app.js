@@ -160,7 +160,7 @@
   // from behind its edges with their own bounce.
   (function deckPopup() {
     let isOpen = false, pop = null, hero = null, opener = null;
-    let slides = [], idx = 0;
+    let slides = [], idx = 0, savedScrollY = 0;
 
     const showSlide = (n) => {
       if (!slides.length) return;
@@ -178,18 +178,19 @@
       slides = Array.from(pop.querySelectorAll('.deck-slide'));
       idx = Math.max(0, slides.findIndex((s) => s.classList.contains('is-active')));
       const card = pop.querySelector('[data-deck-card]');
-      const arrows = Array.from(pop.querySelectorAll('.deck-pop__prev, .deck-pop__next'));
+      const controls = Array.from(pop.querySelectorAll('.deck-pop__prev, .deck-pop__next, .deck-pop__close'));
 
-      document.documentElement.style.overflow = 'hidden'; // lock background scroll
-      if (hero) hero.classList.add('is-deck-open');        // slide the hero panel down
+      savedScrollY = window.scrollY || window.pageYOffset || 0; // restore exactly on close
+      document.documentElement.style.overflow = 'hidden';       // lock background scroll
+      if (hero) hero.classList.add('is-deck-open');             // slide the hero panel down
       pop.hidden = false;
       void pop.offsetWidth;
-      pop.classList.add('is-open');                         // fade the backdrop in (CSS)
+      pop.classList.add('is-open');                             // fade the backdrop in (CSS)
 
       if (reduceMotion) {
         card.style.transform = 'scale(1)';
       } else {
-        arrows.forEach((a) => { a.style.opacity = '0'; });  // hidden until the card lands
+        controls.forEach((a) => { a.style.opacity = '0'; });    // hidden until the card lands
         const grow = card.animate(
           [
             { transform: 'scale(0)', opacity: 0, offset: 0 },
@@ -202,14 +203,17 @@
         grow.onfinish = () => {
           card.style.transform = 'scale(1)';
           grow.cancel();
-          arrows.forEach((a) => {
-            const dir = a.classList.contains('deck-pop__prev') ? 1 : -1; // start tucked toward the card
+          // controls slide out from behind the card's edges, with a bounce settle:
+          // arrows horizontally from the sides, the close diagonally from the top-right.
+          controls.forEach((a) => {
+            const isClose = a.classList.contains('deck-pop__close');
+            const from = isClose
+              ? 'translate(-22px, 56px) scale(0.4)'
+              : `translateY(-50%) translateX(${a.classList.contains('deck-pop__prev') ? 70 : -70}px) scale(0.5)`;
+            const to = isClose ? 'translate(0, 0) scale(1)' : 'translateY(-50%) translateX(0) scale(1)';
             a.style.opacity = '';
             const out = a.animate(
-              [
-                { transform: `translateY(-50%) translateX(${dir * 70}px) scale(0.5)`, opacity: 0 },
-                { transform: 'translateY(-50%) translateX(0) scale(1)', opacity: 1 },
-              ],
+              [{ transform: from, opacity: 0 }, { transform: to, opacity: 1 }],
               { duration: 440, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', fill: 'both' }
             );
             out.onfinish = () => { a.style.transform = ''; out.cancel(); };
@@ -217,7 +221,7 @@
         };
       }
       const frame = pop.querySelector('.deck-pop__frame');
-      if (frame) frame.focus();
+      if (frame) frame.focus({ preventScroll: true });
     }
 
     function close() {
@@ -225,26 +229,27 @@
       isOpen = false;
       const _pop = pop, _hero = hero, _opener = opener;
       const card = _pop.querySelector('[data-deck-card]');
-      const arrows = Array.from(_pop.querySelectorAll('.deck-pop__prev, .deck-pop__next'));
+      const controls = Array.from(_pop.querySelectorAll('.deck-pop__prev, .deck-pop__next, .deck-pop__close'));
       if (_hero) _hero.classList.remove('is-deck-open');
       _pop.classList.remove('is-open');
       document.documentElement.style.overflow = '';
+      window.scrollTo(0, savedScrollY); // undo any scroll shift from the lock / focus
       const finish = () => {
         _pop.hidden = true;
         card.style.transform = '';
-        arrows.forEach((a) => { a.style.opacity = ''; a.style.transform = ''; });
+        controls.forEach((a) => { a.style.opacity = ''; a.style.transform = ''; });
       };
       if (reduceMotion) {
         finish();
       } else {
-        arrows.forEach((a) => a.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'both' }));
+        controls.forEach((a) => a.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'both' }));
         const shrink = card.animate(
           [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(0.1)', opacity: 0 }],
           { duration: 280, easing: 'cubic-bezier(0.5, 0, 0.75, 0.2)', fill: 'both' }
         );
         shrink.onfinish = () => { shrink.cancel(); finish(); };
       }
-      if (_opener && _opener.focus) _opener.focus();
+      if (_opener && _opener.focus) _opener.focus({ preventScroll: true });
       pop = null; hero = null; opener = null;
     }
 
