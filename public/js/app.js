@@ -186,40 +186,35 @@
     let isOpen = false, pop = null, hero = null, opener = null;
     let slides = [], idx = 0, savedScrollY = 0, wiping = false;
 
-    // Page to the next/prev slide (dir = +1 / -1) with a feathered mask wipe and a
-    // sharp white line riding the wipe edge (the --wipe variable animates on the
-    // stage and inherits into the slide masks + the white-line ::after). Mirrors
-    // the full-screen viewer's transition.
+    // Page to the next/prev slide with a fast cross-dissolve: the incoming slide
+    // (is-entering, on top) fades in over the outgoing one. `dir` is kept for the
+    // call sites but a dissolve has no direction. (Previous mask-wipe transition:
+    // docs/popup-slide-wipe.md.)
     const showSlide = (dir) => {
       if (!slides.length || wiping) return;
       const t = (idx + dir + slides.length) % slides.length;
       if (t === idx) return;
       const prevEl = slides[idx], target = slides[t];
-      const stage = pop && pop.querySelector('.deck-pop__stage');
-      if (reduceMotion || !stage) {
+      if (reduceMotion) {
         prevEl.classList.remove('is-active');
         target.classList.add('is-active');
         idx = t;
         return;
       }
       wiping = true;
-      const revealCls = dir > 0 ? 'reveal-next' : 'reveal-prev';
-      const dirCls = dir > 0 ? 'wipe-next' : 'wipe-prev';
-      target.classList.add('is-entering', revealCls);
-      stage.classList.remove('is-wiping', 'wipe-next', 'wipe-prev');
-      void stage.offsetWidth; // restart the --wipe animation cleanly
-      stage.classList.add('is-wiping', dirCls);
+      target.classList.add('is-entering'); // display flex, on top, opacity 0
+      void target.offsetWidth;             // commit opacity 0 before transitioning
+      target.classList.add('is-shown');    // fade opacity -> 1
       const done = (e) => {
-        if (e.target !== stage || e.animationName !== 'deckWipe') return;
-        stage.removeEventListener('animationend', done);
+        if (e.target !== target || e.propertyName !== 'opacity') return;
+        target.removeEventListener('transitionend', done);
         prevEl.classList.remove('is-active');
-        target.classList.remove('is-entering', revealCls);
+        target.classList.remove('is-entering', 'is-shown');
         target.classList.add('is-active');
-        stage.classList.remove('is-wiping', dirCls);
         idx = t;
         wiping = false;
       };
-      stage.addEventListener('animationend', done);
+      target.addEventListener('transitionend', done);
     };
 
     function open(btn) {
@@ -230,9 +225,9 @@
       hero = btn.closest('.hero');
       slides = Array.from(pop.querySelectorAll('.deck-slide'));
       idx = Math.max(0, slides.findIndex((s) => s.classList.contains('is-active')));
-      // Clear any leftover wipe state from a prior (interrupted) session.
+      // Clear any leftover transition state from a prior (interrupted) session.
       wiping = false;
-      slides.forEach((s) => s.classList.remove('is-entering', 'reveal-next', 'reveal-prev'));
+      slides.forEach((s) => s.classList.remove('is-entering', 'is-shown', 'reveal-next', 'reveal-prev'));
       const stage0 = pop.querySelector('.deck-pop__stage');
       if (stage0) stage0.classList.remove('is-wiping', 'wipe-next', 'wipe-prev');
       const card = pop.querySelector('[data-deck-card]');
