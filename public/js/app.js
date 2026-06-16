@@ -208,14 +208,23 @@
         grow.onfinish = () => {
           card.style.transform = 'scale(1)';
           grow.cancel();
-          // controls slide out from behind the card's edges, with a bounce settle:
-          // arrows horizontally from the sides, the close diagonally from the top-right.
+          // controls slide out from behind the card's edges, with a bounce settle.
+          // Landscape/desktop: arrows horizontally from the sides, close from the
+          // top-right. Portrait: arrows up from below the card, close down from
+          // above (the stacked layout — see the CSS portrait media query).
+          const portrait = window.matchMedia('(max-width: 820px) and (orientation: portrait)').matches;
           controls.forEach((a) => {
             const isClose = a.classList.contains('deck-pop__close');
-            const from = isClose
-              ? 'translate(-22px, 56px) scale(0.4)'
-              : `translateY(-50%) translateX(${a.classList.contains('deck-pop__prev') ? 70 : -70}px) scale(0.5)`;
-            const to = isClose ? 'translate(0, 0) scale(1)' : 'translateY(-50%) translateX(0) scale(1)';
+            let from, to;
+            if (portrait) {
+              from = isClose ? 'translateY(34px) scale(0.4)' : 'translateY(-34px) scale(0.5)';
+              to = 'translateY(0) scale(1)';
+            } else {
+              from = isClose
+                ? 'translate(-22px, 56px) scale(0.4)'
+                : `translateY(-50%) translateX(${a.classList.contains('deck-pop__prev') ? 70 : -70}px) scale(0.5)`;
+              to = isClose ? 'translate(0, 0) scale(1)' : 'translateY(-50%) translateX(0) scale(1)';
+            }
             a.style.opacity = '';
             const out = a.animate(
               [{ transform: from, opacity: 0 }, { transform: to, opacity: 1 }],
