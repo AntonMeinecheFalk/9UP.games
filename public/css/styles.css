@@ -754,6 +754,15 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   opacity: 0; transition: opacity 0.4s ease; pointer-events: none;
 }
 .deck-pop.is-open .deck-pop__glow { opacity: 1; }
+/* Second glow layer for a SLOW cross-dissolve (~4x the slide dissolve) so the
+   colour halo lags behind the actual slide change. JS ping-pongs the image
+   between this ::after and the element's own background, toggling .is-glow-after. */
+.deck-pop__glow::after {
+  content: ""; position: absolute; inset: 0;
+  background-image: var(--glow-after, none); background-size: cover; background-position: center;
+  opacity: 0; transition: opacity 0.72s ease;
+}
+.deck-pop__glow.is-glow-after::after { opacity: 1; }
 /* Frame wraps the card (sized to it) plus the arrows in the side gutters. */
 .deck-pop__frame { position: relative; z-index: 1; flex: 0 0 auto; padding-inline: var(--deck-gutter); outline: none; }
 /* The card = the glass rounded box (image-carousel treatment). It grows to the
