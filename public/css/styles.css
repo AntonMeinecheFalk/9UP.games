@@ -870,11 +870,13 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 /* Full-screen viewer keeps the mask wipe. */
 .deck-viewer.is-wiping { animation: deckWipe 0.3s cubic-bezier(0.76, 0, 0.24, 1) forwards; }
 @keyframes deckWipe { from { --wipe: 0%; } to { --wipe: 108%; } }
-/* Popup slide change = fast cross-dissolve: the incoming slide (is-entering, on
-   top) fades in over the outgoing one. The previous mask-wipe + speed-thickened
-   white-line transition is archived in docs/popup-slide-wipe.md. */
-.deck-pop__stage .deck-slide.is-entering { opacity: 0; }
-.deck-pop__stage .deck-slide.is-entering.is-shown { opacity: 1; transition: opacity 0.18s ease; }
+/* Popup slide change = fast blur dissolve: the incoming slide (is-entering, on
+   top) fades in over the outgoing one while sharpening from a blur. */
+.deck-pop__stage .deck-slide.is-entering { opacity: 0; filter: blur(14px); }
+.deck-pop__stage .deck-slide.is-entering.is-shown {
+  opacity: 1; filter: blur(0);
+  transition: opacity 0.22s ease, filter 0.22s ease;
+}
 /* Every block fills the whole slide and they LAYER back-to-front in DOM order
    (first = back, last = front) instead of stacking vertically. Block containers
    don't capture clicks; only the actual content does — so empty areas (and, via

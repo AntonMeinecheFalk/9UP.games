@@ -186,10 +186,9 @@
     let isOpen = false, pop = null, hero = null, opener = null;
     let slides = [], idx = 0, savedScrollY = 0, wiping = false;
 
-    // Page to the next/prev slide with a fast cross-dissolve: the incoming slide
-    // (is-entering, on top) fades in over the outgoing one. `dir` is kept for the
-    // call sites but a dissolve has no direction. (Previous mask-wipe transition:
-    // docs/popup-slide-wipe.md.)
+    // Page to the next/prev slide with a fast blur dissolve: the incoming slide
+    // (is-entering, on top) fades in over the outgoing one while sharpening from a
+    // blur (see CSS). `dir` is kept for the call sites but a dissolve has no direction.
     const showSlide = (dir) => {
       if (!slides.length || wiping) return;
       const t = (idx + dir + slides.length) % slides.length;
