@@ -182,9 +182,11 @@ body.page-admin #main, body.page-deck-edit #main {
   transition: color 0.2s ease, rotate 0.4s ease;
 }
 .site-nav a:hover, .site-nav a:focus-visible, .site-nav a[aria-current="page"] { text-shadow: none; }
-/* Only an ACTUALLY-hovered link wobbles — rotation only, like the CTA buttons,
-   but no bob/lift or shadow. The current-page highlight does NOT wobble. */
-.site-nav a:hover, .site-nav a:focus-visible { animation: btnFloatRot 3s ease-in-out infinite; }
+/* Only an ACTUALLY-hovered link wobbles — rotation only (no bob/lift or shadow);
+   the current-page highlight does NOT wobble. Like the CTA wobble but 2x the
+   angle and 30% faster. */
+.site-nav a:hover, .site-nav a:focus-visible { animation: navWobble 2.1s ease-in-out infinite; }
+@keyframes navWobble { 0% { rotate: 0deg; } 25% { rotate: 2deg; } 75% { rotate: -2deg; } 100% { rotate: 0deg; } }
 .site-nav a::before, .brand::before {
   content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: 50%;
   width: var(--pill-h); transform: translateX(-50%) scale(0); transform-origin: center;
