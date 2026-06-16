@@ -699,7 +699,16 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 /* The bottom hero panel slides down out of frame as the popup opens. */
 .hero.is-deck-open .hero__panel { transform: translateY(135%); opacity: 0; pointer-events: none; }
 
-.deck-pop { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; }
+.deck-pop {
+  --deck-gutter: 4.75rem; /* side space for the arrows */
+  --deck-margin: 1.25rem; /* gap to the screen edges */
+  --avail-w: calc(100vw - 2 * var(--deck-margin) - 2 * var(--deck-gutter));
+  --avail-h: calc(100dvh - var(--header-h) - env(safe-area-inset-top, 0px) - 2.25rem);
+  position: fixed; inset: 0; z-index: 1200;
+  display: flex; align-items: center; justify-content: center;
+  /* clear the fixed header at the top, keep margins on the other sides */
+  padding: calc(var(--header-h) + env(safe-area-inset-top, 0px) + 1rem) var(--deck-margin) var(--deck-margin);
+}
 .deck-pop[hidden] { display: none; }
 /* Backdrop: blurs + darkens the page toward blue; fades in via .is-open. */
 .deck-pop__backdrop {
@@ -709,11 +718,15 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   transition: opacity 0.4s ease;
 }
 .deck-pop.is-open .deck-pop__backdrop { opacity: 1; }
-/* Frame holds the card plus the arrows that live in the side gutters. */
-.deck-pop__frame { position: relative; z-index: 1; width: min(92vw, 1060px); padding-inline: 4.5rem; outline: none; }
-/* The card = the glass rounded box, same treatment as the image-carousel frame. */
+/* Frame wraps the card (sized to it) plus the arrows in the side gutters. */
+.deck-pop__frame { position: relative; z-index: 1; flex: 0 0 auto; padding-inline: var(--deck-gutter); outline: none; }
+/* The card = the glass rounded box (image-carousel treatment). It grows to the
+   largest 16:9 that fits the available width AND height, so it fills the screen
+   without clipping the header or the sides. */
 .deck-pop__card {
-  position: relative; z-index: 3; aspect-ratio: 16 / 9; overflow: hidden;
+  position: relative; z-index: 3; overflow: hidden;
+  width: min(var(--avail-w), var(--avail-h) * 16 / 9);
+  aspect-ratio: 16 / 9;
   border-radius: 20px; background: var(--bg-elev); box-shadow: var(--shadow-panel);
   transform: scale(0); /* closed; app.js animates the bounce-in */
 }
@@ -728,12 +741,14 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
    the X punched out as a see-through hole (its own --arrow-hole). z below the
    card so its slide-out reads as emerging from behind the card edge. */
 .deck-pop__close {
-  --arrow-size: 52px; --tri-size: 22px; z-index: 2;
-  top: -3.4rem; right: 3rem; transform: scale(1);
-  --arrow-hole: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 66'><path fill='%23fff' fill-rule='evenodd' d='M0 0H66V66H0Z M43.6 15.3 L50.7 22.4 L40.1 33 L50.7 43.6 L43.6 50.7 L33 40.1 L22.4 50.7 L15.3 43.6 L25.9 33 L15.3 22.4 L22.4 15.3 L33 25.9 Z'/></svg>");
+  --arrow-size: 56px; --tri-size: 24px; z-index: 2;
+  top: 0; right: 0; transform: scale(1); /* right:0 = same vertical line as .deck-pop__next */
+  /* X-hole: a white disc with a rounded-corner X cut out (evenodd), so the
+     see-through X matches the rounded white glyph. */
+  --arrow-hole: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 66'><path fill='%23fff' fill-rule='evenodd' d='M0 0H66V66H0Z M41.2 17.7 Q43.6 15.3 46 17.7 L48.3 20 Q50.7 22.4 48.3 24.8 L42.5 30.6 Q40.1 33 42.5 35.4 L48.3 41.2 Q50.7 43.6 48.3 46 L46 48.3 Q43.6 50.7 41.2 48.3 L35.4 42.5 Q33 40.1 30.6 42.5 L24.8 48.3 Q22.4 50.7 20 48.3 L17.7 46 Q15.3 43.6 17.7 41.2 L23.5 35.4 Q25.9 33 23.5 30.6 L17.7 24.8 Q15.3 22.4 17.7 20 L20 17.7 Q22.4 15.3 24.8 17.7 L30.6 23.5 Q33 25.9 35.4 23.5 L41.2 17.7Z'/></svg>");
 }
 .deck-pop__close:hover, .deck-pop__close:focus-visible { transform: scale(1.12); }
-.deck-pop__x path { fill: none; }
+.deck-pop__x path { fill: none; stroke-width: 3.6; stroke-linecap: round; } /* rounded ends; weight matches the hole */
 @media (max-width: 820px) { .deck-pop__close { top: 0.5rem; right: 0.5rem; z-index: 6; } }
 /* Arrows: the shared glass arrow in the gutters just outside the card, sitting
    BEHIND it (lower z) so they can slide out from under its edges. */
@@ -741,7 +756,8 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 .deck-pop__prev { left: 0; }
 .deck-pop__next { right: 0; }
 @media (max-width: 820px) {
-  .deck-pop__frame { width: 94vw; padding-inline: 0; }
+  /* No room for side gutters: card fills the width, arrows overlay its edges. */
+  .deck-pop { --deck-gutter: 0px; --deck-margin: 0.5rem; }
   .deck-pop__prev { left: 0.5rem; }
   .deck-pop__next { right: 0.5rem; }
 }
