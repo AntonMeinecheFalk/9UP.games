@@ -707,6 +707,7 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   --deck-gutter: 4.75rem; /* side space for the arrows */
   --deck-margin: 1.25rem; /* gap to the screen edges */
   --avail-w: calc(100vw - 2 * var(--deck-margin) - 2 * var(--deck-gutter));
+  --avail-h: calc(100vh - 2 * var(--deck-margin));  /* fallback if dvh unsupported */
   --avail-h: calc(100dvh - 2 * var(--deck-margin));
   position: fixed; inset: 0; z-index: 1200;
   display: flex; align-items: center; justify-content: center;
@@ -730,6 +731,7 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 .deck-pop__card {
   position: relative; z-index: 3; overflow: hidden;
   width: min(var(--avail-w), var(--avail-h) * 16 / 9);
+  max-width: var(--avail-w); /* never exceed the available width */
   aspect-ratio: 16 / 9;
   border-radius: 20px; background: var(--bg-elev); box-shadow: var(--shadow-panel);
   transform: scale(0); /* closed; app.js animates the bounce-in */

@@ -556,6 +556,14 @@
           doc.body.classList.contains('page-deck')) { location.href = path; return; }
       document.title = doc.title;
       document.body.className = doc.body.className;
+      // Keep the stylesheet fresh: soft-nav swaps <main> but not <head>, so after
+      // a deploy the served CSS version (?v=) changes — adopt it, or we'd keep
+      // rendering swapped-in markup against stale CSS.
+      const newCss = doc.querySelector('link[rel="stylesheet"][href*="/css/styles.css"]');
+      const curCss = document.querySelector('link[rel="stylesheet"][href*="/css/styles.css"]');
+      if (newCss && curCss && newCss.getAttribute('href') !== curCss.getAttribute('href')) {
+        curCss.setAttribute('href', newCss.getAttribute('href'));
+      }
       main.innerHTML = newMain.innerHTML;
       if (push) history.pushState({ softnav: true }, '', path);
       window.scrollTo(0, 0);
