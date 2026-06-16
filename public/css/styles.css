@@ -163,7 +163,11 @@ body.page-admin #main, body.page-deck-edit #main {
 .brand:hover .brand__logo::after, .brand:focus-visible .brand__logo::after { opacity: 1; }
 .brand-edit { display: inline-flex; gap: 0.3rem; }
 .site-nav a, .site-nav-drop a { color: var(--fg); font-weight: 600; text-shadow: var(--text-shadow); }
-.site-nav a:hover, .site-nav-drop a:hover { color: var(--accent-2); text-decoration: none; }
+/* Hover/focus AND the current page ([aria-current]) get the accent text. */
+.site-nav a:hover, .site-nav a:focus-visible, .site-nav a[aria-current="page"],
+.site-nav-drop a:hover, .site-nav-drop a:focus-visible, .site-nav-drop a[aria-current="page"] {
+  color: var(--accent-2); text-decoration: none;
+}
 /* Grow-in white pill (desktop nav links + the brand). On hover a circle scales
    up to the element height, then widens to wrap the contents; unhover runs it in
    reverse. The two phases are sequenced via per-property transition timing, but
@@ -175,9 +179,12 @@ body.page-admin #main, body.page-deck-edit #main {
   position: relative; z-index: 0;
   display: inline-flex; align-items: center; height: var(--pill-h);
   padding: 0 1.1rem; border-radius: var(--radius-pill);
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, rotate 0.4s ease;
 }
-.site-nav a:hover, .site-nav a:focus-visible { text-shadow: none; }
+.site-nav a:hover, .site-nav a:focus-visible, .site-nav a[aria-current="page"] { text-shadow: none; }
+/* Only an ACTUALLY-hovered link wobbles — rotation only, like the CTA buttons,
+   but no bob/lift or shadow. The current-page highlight does NOT wobble. */
+.site-nav a:hover, .site-nav a:focus-visible { animation: btnFloatRot 3s ease-in-out infinite; }
 .site-nav a::before, .brand::before {
   content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: 50%;
   width: var(--pill-h); transform: translateX(-50%) scale(0); transform-origin: center;
@@ -186,7 +193,7 @@ body.page-admin #main, body.page-deck-edit #main {
   transition: width 0.3s cubic-bezier(0.3, 0, 0.2, 1) 0s,
               transform 0.22s cubic-bezier(0.5, 0, 0.4, 1) 0.16s;
 }
-.site-nav a:hover::before, .site-nav a:focus-visible::before,
+.site-nav a:hover::before, .site-nav a:focus-visible::before, .site-nav a[aria-current="page"]::before,
 .brand:hover::before, .brand:focus-visible::before {
   width: 100%; transform: translateX(-50%) scale(1);
   /* forward: scale accelerates out, width picks it up before scale settles */
@@ -295,6 +302,7 @@ body.page-admin #main, body.page-deck-edit #main {
 @media (prefers-reduced-motion: reduce) {
   .btn { transition: filter 0.2s ease, transform 0.2s ease; }
   .btn:hover, .btn:focus-visible { transform: translateY(-3px); animation: none; }
+  .site-nav a:hover, .site-nav a:focus-visible { animation: none; }
 }
 
 /* --- hero --- */

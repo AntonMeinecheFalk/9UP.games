@@ -540,6 +540,14 @@
     let token = 0; // guards against out-of-order responses when clicking fast
     history.scrollRestoration = 'manual';
 
+    // Mark the nav link for `path` as the current page (header + mobile dropdown).
+    function setActiveNav(path) {
+      document.querySelectorAll('.site-nav a, .site-nav-drop a').forEach((a) => {
+        if (a.getAttribute('href') === path) a.setAttribute('aria-current', 'page');
+        else a.removeAttribute('aria-current');
+      });
+    }
+
     async function navigate(path, push) {
       const mine = ++token;
       let html;
@@ -567,6 +575,7 @@
       main.innerHTML = newMain.innerHTML;
       if (push) history.pushState({ softnav: true }, '', path);
       window.scrollTo(0, 0);
+      setActiveNav(location.pathname); // header persists, so update its highlight here
       initContent();
       // Nudge the persistent scroll indicator to re-measure the new page height.
       window.dispatchEvent(new Event('resize'));

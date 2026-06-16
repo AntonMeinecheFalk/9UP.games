@@ -108,11 +108,15 @@ export function layout({ title, body, editMode, extraHead = '', bodyClass = '' }
   // Shared nav links — used by the in-header desktop nav AND the mobile dropdown
   // (the dropdown lives OUTSIDE the header so its backdrop-filter can blur the
   // page; a backdrop-filter nested inside the blurred header is isolated).
+  // Highlight the nav link for the page we're on (kept in sync on soft-nav by app.js).
+  const activeHref = { 'page-home': '/', 'page-games': '/games', 'page-about': '/about', 'page-press': '/press' }[bodyClass] || '';
+  const navLink = (href, label) =>
+    `<a href="${href}"${href === activeHref ? ' aria-current="page"' : ''}>${label}</a>`;
   const navLinks =
-    '<a href="/">Home</a>' +
-    '<a href="/games">Games</a>' +
-    '<a href="/about">About</a>' +
-    '<a href="/press">Press Kit</a>' +
+    navLink('/', 'Home') +
+    navLink('/games', 'Games') +
+    navLink('/about', 'About') +
+    navLink('/press', 'Press Kit') +
     (editMode
       ? '<a class="nav-edit" href="/admin/submissions">Key requests</a>' +
         '<a class="nav-edit nav-exit" href="/logout">Exit edit</a>'
