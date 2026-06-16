@@ -104,75 +104,9 @@
     }
   });
 
-  // Click a video thumbnail -> play fullscreen with OUR controls (YouTube/Vimeo
-  // chrome is hidden via params so it can't interfere with the presentation).
-  function ytCmd(iframe, func) {
-    try { iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*'); } catch (_) {}
-  }
-  function vimeoCmd(iframe, method) {
-    try { iframe.contentWindow.postMessage(JSON.stringify({ method }), '*'); } catch (_) {}
-  }
-  viewer.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-video-thumb]');
-    if (!t) return;
-    const embed = t.dataset.embed;
-    const file = t.dataset.file;
-    if (!embed && !file) return;
-    const thumbHTML = t.innerHTML; // to restore on close
-    t.classList.remove('video-thumb');
-    t.removeAttribute('data-video-thumb');
-    t.innerHTML = '';
-
-    const isYT = /youtube\.com/.test(embed);
-    const isVimeo = /vimeo\.com/.test(embed);
-    let media;
-    if (embed) {
-      // Hide native YouTube/Vimeo UI; we provide our own.
-      let params = 'autoplay=1&controls=0&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&fs=0&enablejsapi=1&disablekb=1';
-      if (isVimeo) params = 'autoplay=1&controls=0&title=0&byline=0&portrait=0&playsinline=1';
-      media = document.createElement('iframe');
-      media.src = embed + (embed.indexOf('?') === -1 ? '?' : '&') + params;
-      media.title = 'Video';
-      media.setAttribute('frameborder', '0');
-      media.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
-    } else {
-      media = document.createElement('video');
-      media.src = file;
-      media.autoplay = true; media.playsInline = true; media.controls = true; // native (browser) controls for files
-    }
-    t.appendChild(media);
-
-    // --- our own UI overlay ---
-    let playing = true;
-    if (embed) {
-      const pp = document.createElement('button');
-      pp.type = 'button'; pp.className = 'deck-video__pp'; pp.textContent = '❚❚';
-      pp.setAttribute('aria-label', 'Play/pause');
-      pp.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        playing = !playing;
-        if (isVimeo) vimeoCmd(media, playing ? 'play' : 'pause');
-        else ytCmd(media, playing ? 'playVideo' : 'pauseVideo');
-        pp.textContent = playing ? '❚❚' : '▶';
-      });
-      t.appendChild(pp);
-    }
-    const close = document.createElement('button');
-    close.type = 'button'; close.className = 'deck-video__close'; close.textContent = '✕';
-    close.setAttribute('aria-label', 'Close video');
-    close.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-      t.innerHTML = thumbHTML;
-      t.classList.add('video-thumb');
-      t.setAttribute('data-video-thumb', '');
-    });
-    t.appendChild(close);
-
-    // Fullscreen the video frame by default.
-    const req = t.requestFullscreen || t.webkitRequestFullscreen;
-    if (req) { try { req.call(t); } catch (_) {} }
-  });
+  // (Video playback UI removed — the slide-deck video player is being rebuilt
+  // with custom controls. Slides render no player/iframe/controls for now, so no
+  // YouTube/Vimeo chrome can appear; see renderSlideBlock.)
 
   viewer.querySelector('[data-deck-fullscreen]')?.addEventListener('click', () => {
     if (document.fullscreenElement) document.exitFullscreen();

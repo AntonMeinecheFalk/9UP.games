@@ -740,25 +740,18 @@ export function renderSlideBlock(block) {
       }
       if (!embed && !fileUrl) return '';
 
-      // If a thumbnail is set, show it with a play button; deck.js loads the
-      // real video (autoplay) only when clicked.
+      // The slide-deck video player is being rebuilt with custom UI. For now we
+      // render NO player UI at all — no <iframe>, no <video controls>, no play
+      // button — so neither our old controls nor any YouTube/Vimeo chrome can
+      // ever show. The source rides on data-attributes for the upcoming custom
+      // player; a thumbnail (if set) shows as a static, non-interactive poster.
       const thumb = block.thumbId ? getMedia(block.thumbId) : null;
-      if (thumb) {
-        return `<div class="slide-block slide-block--video"><div class="video-frame video-thumb" data-video-thumb data-embed="${escapeHtml(
-          embed
-        )}" data-file="${escapeHtml(fileUrl)}" data-mime="${escapeHtml(mime)}">
-          <img src="${escapeHtml(mediaUrl(thumb))}" alt="${escapeHtml(thumb.alt || '')}">
-          <button type="button" class="video-play" aria-label="Play video"></button>
-        </div></div>`;
-      }
-      if (embed) {
-        return `<div class="slide-block slide-block--video"><div class="video-frame"><iframe src="${escapeHtml(
-          embed
-        )}" title="Video" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div></div>`;
-      }
-      return `<div class="slide-block slide-block--video"><div class="video-frame"><video controls preload="metadata" playsinline><source src="${escapeHtml(
-        fileUrl
-      )}" type="${escapeHtml(mime)}"></video></div></div>`;
+      const poster = thumb
+        ? `<img src="${escapeHtml(mediaUrl(thumb))}" alt="${escapeHtml(thumb.alt || '')}">`
+        : '';
+      return `<div class="slide-block slide-block--video"><div class="video-frame" data-video data-embed="${escapeHtml(
+        embed
+      )}" data-file="${escapeHtml(fileUrl)}" data-mime="${escapeHtml(mime)}">${poster}</div></div>`;
     }
     default:
       return '';
