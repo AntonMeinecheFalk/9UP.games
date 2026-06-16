@@ -867,20 +867,30 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   -webkit-mask-image: linear-gradient(100deg, #000 calc(var(--wipe) - 2.5%), transparent calc(var(--wipe) + 2.5%));
   mask-image: linear-gradient(100deg, #000 calc(var(--wipe) - 2.5%), transparent calc(var(--wipe) + 2.5%));
 }
-.deck-viewer.is-wiping, .deck-pop__stage.is-wiping { animation: deckWipe 0.25s cubic-bezier(0.45, 0, 0.55, 1) forwards; }
+/* Strong ease-in-out so the wipe accelerates then decelerates; --wipew (the white
+   line's half-width) peaks at the midpoint where the wipe is fastest, so the line
+   thickens as it speeds up and thins as it slows. */
+@property --wipew { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
+.deck-viewer.is-wiping { animation: deckWipe 0.3s cubic-bezier(0.76, 0, 0.24, 1) forwards; }
+/* Two tracks: --wipe gets one clean ease-in-out (a 2-keyframe animation so the
+   timing function isn't applied per-segment), and --wipew (the white line's
+   half-width) peaks at the midpoint where the wipe is fastest → the line thickens
+   as it speeds up and thins as it slows. */
+.deck-pop__stage.is-wiping { animation: deckWipe 0.3s cubic-bezier(0.76, 0, 0.24, 1) forwards, deckWipeW 0.3s ease-in-out forwards; }
 @keyframes deckWipe { from { --wipe: 0%; } to { --wipe: 108%; } }
+@keyframes deckWipeW { 0% { --wipew: 0.6%; } 50% { --wipew: 2.8%; } 100% { --wipew: 0.6%; } }
 /* In the popup, a sharp white line rides the wipe edge (same --wipe + angle as the
    mask feather) to mask the seam. Only visible while wiping. */
 .deck-pop__stage::after {
   content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none; opacity: 0;
 }
 .deck-pop__stage.is-wiping::after { opacity: 1; }
-/* Wider, hard-edged (no feather) white line. */
+/* Hard-edged (no feather) white line; half-width = --wipew (speed-driven). */
 .deck-pop__stage.is-wiping.wipe-next::after {
-  background: linear-gradient(260deg, transparent calc(var(--wipe) - 0.9%), #fff calc(var(--wipe) - 0.9%), #fff calc(var(--wipe) + 0.9%), transparent calc(var(--wipe) + 0.9%));
+  background: linear-gradient(260deg, transparent calc(var(--wipe) - var(--wipew)), #fff calc(var(--wipe) - var(--wipew)), #fff calc(var(--wipe) + var(--wipew)), transparent calc(var(--wipe) + var(--wipew)));
 }
 .deck-pop__stage.is-wiping.wipe-prev::after {
-  background: linear-gradient(100deg, transparent calc(var(--wipe) - 0.9%), #fff calc(var(--wipe) - 0.9%), #fff calc(var(--wipe) + 0.9%), transparent calc(var(--wipe) + 0.9%));
+  background: linear-gradient(100deg, transparent calc(var(--wipe) - var(--wipew)), #fff calc(var(--wipe) - var(--wipew)), #fff calc(var(--wipe) + var(--wipew)), transparent calc(var(--wipe) + var(--wipew)));
 }
 /* Every block fills the whole slide and they LAYER back-to-front in DOM order
    (first = back, last = front) instead of stacking vertically. Block containers
