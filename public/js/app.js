@@ -186,14 +186,26 @@
     let isOpen = false, pop = null, hero = null, opener = null;
     let slides = [], idx = 0, savedScrollY = 0, wiping = false;
 
-    // Page to the next/prev slide with a fast blur dissolve: the incoming slide
-    // (is-entering, on top) fades in over the outgoing one while sharpening from a
-    // blur (see CSS). `dir` is kept for the call sites but a dissolve has no direction.
+    // Point the outer glow at a slide's primary image (its colours bleed around
+    // the card; see .deck-pop__glow). Falls back to clearing it if the slide has
+    // no image (e.g. a video-only slide).
+    const setGlow = (slide) => {
+      const glow = pop && pop.querySelector('[data-deck-glow]');
+      if (!glow) return;
+      const img = slide && slide.querySelector('.deck-slide__bg, .slide-block--image img');
+      const src = img && (img.currentSrc || img.getAttribute('src'));
+      glow.style.backgroundImage = src ? `url("${src}")` : '';
+    };
+
+    // Page to the next/prev slide with a fast cross-dissolve: the incoming slide
+    // (is-entering, on top) fades in over the outgoing one. `dir` is kept for the
+    // call sites but a dissolve has no direction.
     const showSlide = (dir) => {
       if (!slides.length || wiping) return;
       const t = (idx + dir + slides.length) % slides.length;
       if (t === idx) return;
       const prevEl = slides[idx], target = slides[t];
+      setGlow(target);
       if (reduceMotion) {
         prevEl.classList.remove('is-active');
         target.classList.add('is-active');
@@ -229,6 +241,7 @@
       slides.forEach((s) => s.classList.remove('is-entering', 'is-shown', 'reveal-next', 'reveal-prev'));
       const stage0 = pop.querySelector('.deck-pop__stage');
       if (stage0) stage0.classList.remove('is-wiping', 'wipe-next', 'wipe-prev');
+      setGlow(slides[idx]); // glow for the first slide shown
       const card = pop.querySelector('[data-deck-card]');
       const closeBtn = pop.querySelector('.deck-pop__close');
       const arrows = Array.from(pop.querySelectorAll('.deck-pop__prev, .deck-pop__next'));

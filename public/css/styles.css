@@ -741,6 +741,19 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   transition: opacity 0.4s ease;
 }
 .deck-pop.is-open .deck-pop__backdrop { opacity: 1; }
+/* Outer glow: a blurred, scaled copy of the current slide's image sitting BEHIND
+   the card (z below the frame) and soft-light-blended with the backdrop, so the
+   slide's colours bleed into the space around the card. JS sets its background
+   per slide; it's card-sized + centred (≈ the card) and the blur spreads it out. */
+.deck-pop__glow {
+  position: absolute; left: 50%; top: 50%; z-index: 0;
+  width: min(var(--avail-w), var(--avail-h) * 16 / 9); aspect-ratio: 16 / 9;
+  transform: translate(-50%, -50%) scale(1.06);
+  background-size: cover; background-position: center;
+  filter: blur(55px); mix-blend-mode: soft-light;
+  opacity: 0; transition: opacity 0.4s ease; pointer-events: none;
+}
+.deck-pop.is-open .deck-pop__glow { opacity: 1; }
 /* Frame wraps the card (sized to it) plus the arrows in the side gutters. */
 .deck-pop__frame { position: relative; z-index: 1; flex: 0 0 auto; padding-inline: var(--deck-gutter); outline: none; }
 /* The card = the glass rounded box (image-carousel treatment). It grows to the
@@ -870,13 +883,10 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 /* Full-screen viewer keeps the mask wipe. */
 .deck-viewer.is-wiping { animation: deckWipe 0.3s cubic-bezier(0.76, 0, 0.24, 1) forwards; }
 @keyframes deckWipe { from { --wipe: 0%; } to { --wipe: 108%; } }
-/* Popup slide change = fast blur dissolve: the incoming slide (is-entering, on
-   top) fades in over the outgoing one while sharpening from a blur. */
-.deck-pop__stage .deck-slide.is-entering { opacity: 0; filter: blur(14px); }
-.deck-pop__stage .deck-slide.is-entering.is-shown {
-  opacity: 1; filter: blur(0);
-  transition: opacity 0.22s ease, filter 0.22s ease;
-}
+/* Popup slide change = fast cross-dissolve: the incoming slide (is-entering, on
+   top) fades in over the outgoing one. */
+.deck-pop__stage .deck-slide.is-entering { opacity: 0; }
+.deck-pop__stage .deck-slide.is-entering.is-shown { opacity: 1; transition: opacity 0.18s ease; }
 /* Every block fills the whole slide and they LAYER back-to-front in DOM order
    (first = back, last = front) instead of stacking vertically. Block containers
    don't capture clicks; only the actual content does — so empty areas (and, via

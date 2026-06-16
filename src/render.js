@@ -385,6 +385,7 @@ export function renderDeckPopup(game, slides) {
       : '';
   return `<div class="deck-pop" data-deck-pop hidden>
     <div class="deck-pop__backdrop" data-deck-close></div>
+    <div class="deck-pop__glow" data-deck-glow aria-hidden="true"></div>
     <div class="deck-pop__frame" role="dialog" aria-modal="true" aria-label="${escapeHtml(
       game.title
     )} — pitch deck" tabindex="-1">
