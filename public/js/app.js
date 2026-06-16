@@ -184,13 +184,42 @@
   // from behind its edges with their own bounce.
   (function deckPopup() {
     let isOpen = false, pop = null, hero = null, opener = null;
-    let slides = [], idx = 0, savedScrollY = 0;
+    let slides = [], idx = 0, savedScrollY = 0, wiping = false;
 
-    const showSlide = (n) => {
-      if (!slides.length) return;
-      slides[idx] && slides[idx].classList.remove('is-active');
-      idx = (n + slides.length) % slides.length;
-      slides[idx].classList.add('is-active');
+    // Page to the next/prev slide (dir = +1 / -1) with a feathered mask wipe and a
+    // sharp white line riding the wipe edge (the --wipe variable animates on the
+    // stage and inherits into the slide masks + the white-line ::after). Mirrors
+    // the full-screen viewer's transition.
+    const showSlide = (dir) => {
+      if (!slides.length || wiping) return;
+      const t = (idx + dir + slides.length) % slides.length;
+      if (t === idx) return;
+      const prevEl = slides[idx], target = slides[t];
+      const stage = pop && pop.querySelector('.deck-pop__stage');
+      if (reduceMotion || !stage) {
+        prevEl.classList.remove('is-active');
+        target.classList.add('is-active');
+        idx = t;
+        return;
+      }
+      wiping = true;
+      const revealCls = dir > 0 ? 'reveal-next' : 'reveal-prev';
+      const dirCls = dir > 0 ? 'wipe-next' : 'wipe-prev';
+      target.classList.add('is-entering', revealCls);
+      stage.classList.remove('is-wiping', 'wipe-next', 'wipe-prev');
+      void stage.offsetWidth; // restart the --wipe animation cleanly
+      stage.classList.add('is-wiping', dirCls);
+      const done = (e) => {
+        if (e.target !== stage || e.animationName !== 'deckWipe') return;
+        stage.removeEventListener('animationend', done);
+        prevEl.classList.remove('is-active');
+        target.classList.remove('is-entering', revealCls);
+        target.classList.add('is-active');
+        stage.classList.remove('is-wiping', dirCls);
+        idx = t;
+        wiping = false;
+      };
+      stage.addEventListener('animationend', done);
     };
 
     function open(btn) {
@@ -201,6 +230,11 @@
       hero = btn.closest('.hero');
       slides = Array.from(pop.querySelectorAll('.deck-slide'));
       idx = Math.max(0, slides.findIndex((s) => s.classList.contains('is-active')));
+      // Clear any leftover wipe state from a prior (interrupted) session.
+      wiping = false;
+      slides.forEach((s) => s.classList.remove('is-entering', 'reveal-next', 'reveal-prev'));
+      const stage0 = pop.querySelector('.deck-pop__stage');
+      if (stage0) stage0.classList.remove('is-wiping', 'wipe-next', 'wipe-prev');
       const card = pop.querySelector('[data-deck-card]');
       const closeBtn = pop.querySelector('.deck-pop__close');
       const arrows = Array.from(pop.querySelectorAll('.deck-pop__prev, .deck-pop__next'));
@@ -318,21 +352,21 @@
       if (btn) { e.preventDefault(); open(btn); return; }
       if (!isOpen) return;
       if (e.target.closest('[data-deck-close]')) { e.preventDefault(); close(); return; }
-      if (e.target.closest('[data-deck-prev]')) { showSlide(idx - 1); return; }
-      if (e.target.closest('[data-deck-next]')) { showSlide(idx + 1); return; }
+      if (e.target.closest('[data-deck-prev]')) { showSlide(-1); return; }
+      if (e.target.closest('[data-deck-next]')) { showSlide(1); return; }
     });
     document.addEventListener('keydown', (e) => {
       if (!isOpen) return;
       if (e.key === 'Escape') close();
-      else if (e.key === 'ArrowRight') showSlide(idx + 1);
-      else if (e.key === 'ArrowLeft') showSlide(idx - 1);
+      else if (e.key === 'ArrowRight') showSlide(1);
+      else if (e.key === 'ArrowLeft') showSlide(-1);
     });
     let sx = null;
     document.addEventListener('touchstart', (e) => { if (isOpen) sx = e.touches[0].clientX; }, { passive: true });
     document.addEventListener('touchend', (e) => {
       if (!isOpen || sx == null) return;
       const dx = e.changedTouches[0].clientX - sx;
-      if (Math.abs(dx) > 50) showSlide(dx < 0 ? idx + 1 : idx - 1);
+      if (Math.abs(dx) > 50) showSlide(dx < 0 ? 1 : -1);
       sx = null;
     });
   })();

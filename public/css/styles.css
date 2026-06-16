@@ -865,8 +865,20 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
   -webkit-mask-image: linear-gradient(100deg, #000 calc(var(--wipe) - 2.5%), transparent calc(var(--wipe) + 2.5%));
   mask-image: linear-gradient(100deg, #000 calc(var(--wipe) - 2.5%), transparent calc(var(--wipe) + 2.5%));
 }
-.deck-viewer.is-wiping { animation: deckWipe 0.25s cubic-bezier(0.45, 0, 0.55, 1) forwards; }
+.deck-viewer.is-wiping, .deck-pop__stage.is-wiping { animation: deckWipe 0.25s cubic-bezier(0.45, 0, 0.55, 1) forwards; }
 @keyframes deckWipe { from { --wipe: 0%; } to { --wipe: 108%; } }
+/* In the popup, a sharp white line rides the wipe edge (same --wipe + angle as the
+   mask feather) to mask the seam. Only visible while wiping. */
+.deck-pop__stage::after {
+  content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none; opacity: 0;
+}
+.deck-pop__stage.is-wiping::after { opacity: 1; }
+.deck-pop__stage.is-wiping.wipe-next::after {
+  background: linear-gradient(260deg, transparent calc(var(--wipe) - 1.1%), #fff calc(var(--wipe) - 0.35%), #fff calc(var(--wipe) + 0.35%), transparent calc(var(--wipe) + 1.1%));
+}
+.deck-pop__stage.is-wiping.wipe-prev::after {
+  background: linear-gradient(100deg, transparent calc(var(--wipe) - 1.1%), #fff calc(var(--wipe) - 0.35%), #fff calc(var(--wipe) + 0.35%), transparent calc(var(--wipe) + 1.1%));
+}
 /* Every block fills the whole slide and they LAYER back-to-front in DOM order
    (first = back, last = front) instead of stacking vertically. Block containers
    don't capture clicks; only the actual content does — so empty areas (and, via
