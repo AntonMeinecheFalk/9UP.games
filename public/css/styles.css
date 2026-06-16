@@ -174,19 +174,30 @@ body.page-admin #main, body.page-deck-edit #main {
    they OVERLAP and hand off at speed (scale accelerates out, width decelerates
    in) so there's no dead-stop between the circle and the widen. Each element
    sets its own --pill-h; the collapsed pill is a circle of that diameter. */
+/* --wob is the wobble amplitude (0 = still, 1 = full). Registered so it can be
+   transitioned, which lets the rotation lerp smoothly in/out of the loop. */
+@property --wob { syntax: "<number>"; inherits: false; initial-value: 0; }
 .site-nav a {
-  --pill-h: 2.4rem; margin-left: 2.75rem;
+  --pill-h: 2.4rem; margin-left: 2.75rem; --wob: 0;
   position: relative; z-index: 0;
   display: inline-flex; align-items: center; height: var(--pill-h);
   padding: 0 1.1rem; border-radius: var(--radius-pill);
-  transition: color 0.2s ease, rotate 0.4s ease;
+  /* The wobble runs continuously but at amplitude --wob (0 when idle, so no
+     visible motion). Hover lerps --wob 0->1 (fade the rotation in/out) and grows
+     the link slightly with an overshoot settle. */
+  animation: navWobble 2.1s ease-in-out infinite;
+  transition: color 0.2s ease, scale 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), --wob 0.45s ease;
 }
 .site-nav a:hover, .site-nav a:focus-visible, .site-nav a[aria-current="page"] { text-shadow: none; }
-/* Only an ACTUALLY-hovered link wobbles — rotation only (no bob/lift or shadow);
-   the current-page highlight does NOT wobble. Like the CTA wobble but 2x the
-   angle and 30% faster. */
-.site-nav a:hover, .site-nav a:focus-visible { animation: navWobble 2.1s ease-in-out infinite; }
-@keyframes navWobble { 0% { rotate: 0deg; } 25% { rotate: 2deg; } 75% { rotate: -2deg; } 100% { rotate: 0deg; } }
+/* Only an ACTUALLY-hovered link wobbles + grows (the current-page highlight does
+   not). Rotation only — no bob/lift or shadow — 2x the CTA angle, 30% faster. */
+.site-nav a:hover, .site-nav a:focus-visible { scale: 1.05; --wob: 1; }
+@keyframes navWobble {
+  0%   { rotate: 0deg; }
+  25%  { rotate: calc(var(--wob) * 2deg); }
+  75%  { rotate: calc(var(--wob) * -2deg); }
+  100% { rotate: 0deg; }
+}
 .site-nav a::before, .brand::before {
   content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: 50%;
   width: var(--pill-h); transform: translateX(-50%) scale(0); transform-origin: center;
@@ -304,7 +315,8 @@ body.page-admin #main, body.page-deck-edit #main {
 @media (prefers-reduced-motion: reduce) {
   .btn { transition: filter 0.2s ease, transform 0.2s ease; }
   .btn:hover, .btn:focus-visible { transform: translateY(-3px); animation: none; }
-  .site-nav a:hover, .site-nav a:focus-visible { animation: none; }
+  .site-nav a { animation: none; }
+  .site-nav a:hover, .site-nav a:focus-visible { scale: 1; }
 }
 
 /* --- hero --- */
