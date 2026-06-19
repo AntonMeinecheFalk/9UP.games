@@ -23,7 +23,8 @@ export const triSvg = () =>
 
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const THEME_LABELS = {
-  bg: 'Background',
+  bg: 'Background (top)',
+  bg2: 'Background (bottom)',
   surface: 'Panels & cards',
   text: 'Text',
   muted: 'Muted text',
@@ -53,6 +54,7 @@ function themeStyle(theme) {
   const bodyStack = fontById(theme.bodyFont).stack;
   return `<style id="theme-vars">:root{` +
     `--bg:${safe('bg')};` +
+    `--bg2:${safe('bg2')};` +
     `--bg-rgb:${hexToRgb(safe('bg'))};` +
     `--bg-card:${safe('surface')};` +
     `--bg-elev:${safe('surface')};` +
@@ -104,6 +106,7 @@ export function layout({ title, body, editMode, extraHead = '', bodyClass = '' }
   const siteTitle = escapeHtml(Site.title());
   const pageTitle = title ? `${escapeHtml(title)} — ${siteTitle}` : siteTitle;
   const theme = Site.theme();
+  const bgHex = HEX_RE.test(String(theme.bg)) ? theme.bg : DEFAULT_THEME.bg;
   const siteLogo = getMedia(Site.siteLogoId());
   // Shared nav links — used by the in-header desktop nav AND the mobile dropdown
   // (the dropdown lives OUTSIDE the header so its backdrop-filter can blur the
@@ -113,11 +116,12 @@ export function layout({ title, body, editMode, extraHead = '', bodyClass = '' }
   const navLink = (href, label) =>
     `<a href="${href}"${href === activeHref ? ' aria-current="page"' : ''}>${label}</a>`;
   const navLinks =
-    navLink('/contact', 'Contact') +
     navLink('/', 'Home') +
     navLink('/games', 'Games') +
     navLink('/about', 'About') +
     navLink('/press', 'Press Kit') +
+    // Contact sits last (far right); it links to the contact page, which shows our email.
+    navLink('/contact', 'Contact') +
     (editMode
       ? '<a class="nav-edit" href="/admin/submissions">Key requests</a>' +
         '<a class="nav-edit nav-exit" href="/logout">Exit edit</a>'
@@ -149,7 +153,26 @@ ${extraHead}
      clip-path: url() element itself renders no blur — only the parent-crops-child route does). -->
 <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
   <clipPath id="vt-clip-play" clipPathUnits="objectBoundingBox"><path d="M.34 .292 Q.34 .214 .39 .253 L.75 .461 Q.80 .50 .75 .539 L.39 .747 Q.34 .786 .34 .708 Z"/></clipPath>
+  <!-- Photoshop-style "threshold" for the drifting paw field: collapse the paw
+       image's luminance to a hard 0/1 alpha mask, then flood it with the (top)
+       background colour. The cut is fixed at 0.5; each paw shifts its threshold by
+       pre-multiplying brightness in CSS (filter: brightness(b) url(#pawThreshold)),
+       so b = 127.5 / T maps to a Photoshop threshold of T (b≈0.58 → 220, ≈3.19 → 40).
+       flood-color is the top bg colour; app.js keeps it synced to --bg. -->
+  <filter id="pawThreshold" color-interpolation-filters="sRGB" x="-5%" y="-5%" width="110%" height="110%">
+    <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.2126 0.7152 0.0722 0 0" result="lum"/>
+    <feComponentTransfer in="lum" result="mask"><feFuncA type="discrete" tableValues="0 1"/></feComponentTransfer>
+    <feFlood flood-color="${escapeHtml(bgHex)}" result="col" data-paw-flood/>
+    <feComposite in="col" in2="mask" operator="in"/>
+  </filter>
 </defs></svg>
+<!-- The paw filter ref MUST live in an in-document style block: a url(#id) filter
+     fragment in the EXTERNAL stylesheet resolves against the stylesheet URL in
+     Chrome (not the page), so it can't find pawThreshold and the paw renders
+     invisible. Brightness (the threshold pre-multiply) stays a per-paw CSS var. -->
+<style>.paw{filter:brightness(var(--b,0.58)) url(#pawThreshold);}</style>
+<div class="bg-gradient" aria-hidden="true"></div>
+<div class="paw-field" data-paw-field aria-hidden="true"></div>
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="wrap">
@@ -648,14 +671,20 @@ export function renderTeamCard(member, editMode) {
     : `<div class="team-card__img team-card__img--empty" aria-hidden="true"></div>`;
 
   if (!editMode) {
+    // LinkedIn "in" glyph (replaces the old "LinkedIn" text label).
+    const liLogo =
+      '<svg class="team-card__li" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+      '<path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.55C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.72C24 .77 23.2 0 22.22 0z"/></svg>';
     return `<article class="team-card">
-      ${imgHtml}
+      <div class="team-card__avatar">${imgHtml}</div>
+      <span class="team-card__rule" aria-hidden="true"></span>
       <h3 class="team-card__name">${escapeHtml(member.name)}</h3>
+      <span class="team-card__rule" aria-hidden="true"></span>
       <p class="team-card__role">${escapeHtml(member.title)}</p>
       <p class="team-card__desc">${escapeHtml(member.description)}</p>
       ${
         linkedin
-          ? `<a class="btn btn--linkedin" href="${escapeHtml(linkedin)}" target="_blank" rel="noopener">LinkedIn</a>`
+          ? `<a class="btn btn--linkedin" href="${escapeHtml(linkedin)}" target="_blank" rel="noopener" aria-label="LinkedIn">${liLogo}</a>`
           : ''
       }
     </article>`;

@@ -67,15 +67,74 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
 body {
   margin: 0;
   font-family: var(--font-body);
+  /* The viewport gradient lives on a fixed .bg-gradient layer (below), NOT here as
+     background-attachment:fixed — iOS Safari renders bg-attachment:fixed unreliably
+     (wrong sampling → hero-fade colour mismatch) and repaints it every scroll frame
+     (jank). A position:fixed div is GPU-composited and reliably viewport-locked. */
   background: var(--bg);
   color: var(--fg);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
+/* Viewport-fixed background gradient (bg → bg2 toward the bottom of the screen). */
+.bg-gradient {
+  position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background: linear-gradient(to bottom, var(--bg) 0%, var(--bg2) 100%);
+}
 img, video { max-width: 100%; height: auto; display: block; }
 a { color: var(--accent-2); text-decoration: none; }
+
+/* --- Multiply-blended cast shadows ----------------------------------------
+   CSS box-shadow can't take a blend mode, so each cast shadow is repainted by a
+   dedicated ::after layer set to mix-blend-mode: multiply. Multiply only ever
+   darkens, so the shadow stays visible even where the page-background gradient is
+   darker than the shadow colour — a plain shadow would vanish there, and a light
+   shadow would read as a glow. Each element opts in by setting --cast to its
+   shadow geometry (default = the panel shadow). Buttons and the overflow-clipped
+   carousel frame paint their own multiply variants (further down). */
+.hero__panel::after, .team-card::after, .press-request::after, .game-list a::after,
+.pitch-toolbar::after, .hero__edit::after,
+.hero-adjust::after, .theme-toggle::after, .theme-panel::after,
+.upload-progress__card::after, .site-nav-drop::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  box-shadow: var(--cast, var(--shadow-panel));
+  mix-blend-mode: multiply; z-index: -1; pointer-events: none;
+}
+/* Screen-blend top rim light shared by the glass content cards (matches the
+   hero panel / dropdown). A ::before so it composes with the ::after shadow. */
+.team-card::before, .press-request::before, .game-list a::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  border-top: 2px solid var(--btn-highlight); mix-blend-mode: screen; opacity: 0.5;
+}
 a:hover { text-decoration: underline; }
 h1, h2, h3 { line-height: 1.2; font-weight: 700; font-family: var(--font-heading); }
+
+/* --- Drifting paw field ----------------------------------------------------
+   A 45°-rotated (diamond) lattice of paw prints that constantly drifts across
+   the page, sitting between the gradient background and the content. Each paw is
+   the PawGradient image run through the #pawThreshold filter (Photoshop-threshold
+   → masked, flooded with the top background colour). app.js builds the lattice,
+   drives the drift, and lerps each paw's threshold (via --b) toward the cursor. */
+.paw-field {
+  position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+  contain: layout paint;
+  opacity: 0.4; /* keep the paw texture as a subtle background wash */
+}
+.paw-field__drift { position: absolute; top: 0; left: 0; will-change: transform; }
+.paw {
+  position: absolute; top: 0; left: 0;
+  width: var(--paw-size, 84px); height: var(--paw-size, 84px);
+  max-width: none; /* override the global img{max-width:100%} — the 0-width drift
+                      layer would otherwise collapse the paw to nothing. */
+  /* position (drift) + centering + rotation are written by app.js as one transform
+     each frame; no CSS transition (it would lag the per-frame drift). */
+  pointer-events: none; user-select: none;
+  /* NOTE: the threshold `filter` is set in an in-document <style> (see render.js),
+     NOT here — `filter: url(#id)` in an EXTERNAL stylesheet resolves the fragment
+     against the stylesheet URL in Chrome, fails to find the filter, and renders the
+     element invisible. An in-document rule resolves it against the page. */
+}
+@media (prefers-reduced-motion: reduce) { .paw-field__drift { will-change: auto; } }
 
 /* Visually hidden but available to screen readers + SEO. */
 .sr-only {
@@ -247,18 +306,21 @@ body.page-admin #main, body.page-deck-edit #main {
   font-weight: 700; font-size: 1rem; border: none; cursor: pointer; color: #fff;
   text-align: center; line-height: 1.2;
   background: linear-gradient(to top, var(--accent) 0%, var(--accent-2) 100%);
-  /* Drop shadow as a real box-shadow: it always paints behind the box, even
-     while the button is transformed/rotated on hover, so it can never flip in
-     front or vanish. Grows + softens on hover to read as lifting off the page.
-     (box-shadow can't do mix-blend multiply, but on a dark theme it's visually
-     equivalent to a multiply shadow.) */
-  box-shadow: 0 7px 16px -4px var(--btn-shadow);
+  /* Drop shadow lives on the ::after layer (below) so it can mix-blend multiply
+     and stay visible on any background; it's a child pseudo, so it still rides
+     the button's hover transform/rotate and can never flip in front. */
   transition:
     transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.4s ease,
     filter 0.3s ease,
     translate 0.4s ease,
     rotate 0.4s ease;
+}
+/* Multiply drop shadow; grows + softens on hover to read as lifting off the page. */
+.btn::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  box-shadow: 0 7px 16px -4px var(--btn-shadow);
+  mix-blend-mode: multiply; z-index: -1; pointer-events: none;
+  transition: box-shadow 0.4s ease;
 }
 /* top-rim highlight (screen) — a sharp 2px rim, no blur. Positive z-index so it
    always sits above the fill (independent of any hover stacking context); it's
@@ -270,9 +332,11 @@ body.page-admin #main, body.page-deck-edit #main {
   mix-blend-mode: screen; pointer-events: none;
   opacity: 0.5; transition: opacity 0.4s ease;
 }
+.btn:hover::after, .btn:focus-visible::after {
+  box-shadow: 0 22px 34px -6px var(--btn-shadow);
+}
 .btn:hover, .btn:focus-visible {
   text-decoration: none;
-  box-shadow: 0 22px 34px -6px var(--btn-shadow);
   transform: translateY(-7px) scale(1.06);
   /* Same duration, but the rotation is phase-shifted a quarter cycle from the
      bob (peaks at 25%/75% vs the bob's peak at 50%), so their extremes never
@@ -318,7 +382,10 @@ body.page-admin #main, body.page-deck-edit #main {
 /* --- hero --- */
 .hero {
   position: relative; min-height: 90vh; display: flex; flex-direction: column; justify-content: flex-end;
-  background-color: var(--bg-elev);
+  /* Transparent so the art's masked-out bottom reveals the fixed .bg-gradient (and
+     paw field) behind it — that IS the page background, so the hero blends into it
+     with a colour computed by CSS from screen position (no JS sampling, no lag). */
+  background-color: transparent;
 }
 /* When the hero is the top element, pull it up behind the (glass) bar so the
    art runs under it. Add the bar's height back to min-height so the bottom
@@ -332,7 +399,14 @@ body.page-admin #main, body.page-deck-edit #main {
 .hero--empty { background: linear-gradient(135deg, #20232e, #14161d); }
 /* Dedicated clip layer for the (zoomable) hero image, so the panel's drop
    shadow can still bleed past the hero into the next section. */
-.hero__bg { position: absolute; inset: 0; overflow: hidden; z-index: 0; }
+.hero__bg {
+  position: absolute; inset: 0; overflow: hidden; z-index: 0;
+  /* Fade the art out toward the bottom so the real page background shows through
+     (see .hero). The blend colour is therefore the actual .bg-gradient at that
+     screen row — always correct, with no per-scroll JS sampling. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 50%, rgba(0,0,0,0.5) 72%, transparent 90%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 50%, rgba(0,0,0,0.5) 72%, transparent 90%);
+}
 /* Hero image: object-fit cover (always fills the frame). Parallax PANS through
    the image via object-position (so a tall image reveals its full height and
    the edge never shows), --focus-x/y = the tuned crop, --hero-zoom = zoom. */
@@ -342,16 +416,11 @@ body.page-admin #main, body.page-deck-edit #main {
   object-position: var(--focus-x, 50%) var(--parallax-pos, var(--focus-y, 50%));
   transform: scale(var(--hero-zoom, 1));
 }
-/* Full-bleed gradient that fades to the exact page background colour, so the
-   hero image blends seamlessly into the page below it. */
+/* No fill here anymore — the blend into the page is done by fading the ART
+   (.hero__bg mask) to reveal the real .bg-gradient behind it. */
 .hero__overlay {
   position: relative; z-index: 1; width: 100%;
   padding: 6rem 0 3rem;
-  background: linear-gradient(to top,
-    rgba(var(--bg-rgb), 1) 0%,
-    rgba(var(--bg-rgb), 0.85) 12%,
-    rgba(var(--bg-rgb), 0.45) 45%,
-    rgba(var(--bg-rgb), 0) 100%);
 }
 .hero__inner { width: 100%; }
 /* Frosted rounded panel holding the logo + CTAs (left) and the elevator pitch
@@ -364,8 +433,8 @@ body.page-admin #main, body.page-deck-edit #main {
   border-radius: 28px;
   padding: 1.5rem 1.75rem;
   -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
-  /* cast shadow inherits the button shadow colour */
-  box-shadow: var(--shadow-panel);
+  /* cast shadow painted by the multiply ::after layer (--cast = panel shadow) */
+  --cast: var(--shadow-panel);
   /* Resting/return transition (used when the popup closes): ease-OUT so the panel
      decelerates and settles instead of stopping abruptly. The slide-OUT on open
      uses its own ease-in below. */
@@ -415,7 +484,7 @@ body.page-admin #main, body.page-deck-edit #main {
 .pitch-toolbar {
   position: fixed; z-index: 80; display: flex; gap: 0.3rem;
   background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-pill); padding: 0.35rem; box-shadow: var(--shadow);
+  border-radius: var(--radius-pill); padding: 0.35rem; --cast: var(--shadow);
 }
 .pitch-toolbar button {
   background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border);
@@ -444,17 +513,19 @@ body.page-admin #main, body.page-deck-edit #main {
   display: flex; flex-direction: column; gap: 0.6rem;
 }
 .hero__edit {
+  position: relative;
   display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;
   background: rgba(var(--bg-rgb), 0.8); -webkit-backdrop-filter: var(--blur-md); backdrop-filter: var(--blur-md);
   border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 0.6rem 0.7rem; box-shadow: var(--shadow);
+  padding: 0.6rem 0.7rem; --cast: var(--shadow);
 }
 .hero__edit .ctl-inline { font-size: 0.85rem; gap: 0.4rem; }
 .hero__edit .ctl-inline input { width: 200px; max-width: 45vw; }
 /* Per-game hero/logo adjust panel (edit mode) — drops below the controls card. */
 .hero-adjust {
+  position: relative;
   background: rgba(var(--bg-rgb), 0.92); -webkit-backdrop-filter: var(--blur-md); backdrop-filter: var(--blur-md);
-  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  border: 1px solid var(--border); border-radius: var(--radius); --cast: var(--shadow);
   padding: 1rem 1.25rem; display: flex; gap: 1.5rem; flex-wrap: wrap;
 }
 .hero-adjust[hidden] { display: none; }
@@ -538,13 +609,21 @@ body.page-admin #main, body.page-deck-edit #main {
 
 /* --- carousel --- */
 /* Side gutters hold the arrows OUTSIDE the image frame. */
-.carousel { position: relative; padding-inline: 4rem; }
+.carousel { position: relative; padding-inline: 4rem; --carousel-gutter: 4rem; }
+/* The frame (.carousel__track) is overflow:hidden to clip the cover image, which
+   would also clip a child shadow — so its multiply cast shadow is painted here,
+   on the (un-clipped) gutter wrapper, matched to the frame's 16:9 box. */
+.carousel::before {
+  content: ""; position: absolute; top: 0;
+  left: var(--carousel-gutter); right: var(--carousel-gutter);
+  aspect-ratio: 16 / 9; border-radius: 20px;
+  box-shadow: var(--shadow-panel); mix-blend-mode: multiply; z-index: -1; pointer-events: none;
+}
 /* The frame: a 16:9 rounded box; the image COVERS it (fills entirely) and is
    masked to the rounded corners by overflow:hidden. */
 .carousel__track {
   position: relative; aspect-ratio: 16 / 9; overflow: hidden;
   border-radius: 20px; background: var(--bg-elev);
-  box-shadow: var(--shadow-panel);
 }
 .carousel__slide { position: absolute; inset: 0; margin: 0; display: none; }
 .carousel__slide.is-active { display: block; }
@@ -593,7 +672,7 @@ body.page-admin #main, body.page-deck-edit #main {
 .carousel__add { padding: 0.75rem; }
 /* Phones: no room for outside gutters — overlay the arrows on the frame edges. */
 @media (max-width: 820px) {
-  .carousel { padding-inline: 0; }
+  .carousel { padding-inline: 0; --carousel-gutter: 0px; }
   .carousel__prev { left: 0.5rem; }
   .carousel__next { right: 0.5rem; }
 }
@@ -747,8 +826,9 @@ body.page-admin #main, body.page-deck-edit #main {
 .upload-progress.is-open { display: flex; }
 .upload-progress__card {
   width: min(440px, 88vw); padding: 1.4rem 1.5rem; border-radius: 18px; color: var(--text);
+  position: relative;
   background: rgba(var(--bg-rgb), 0.92); -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
-  box-shadow: var(--shadow-panel); border-top: 2px solid var(--btn-highlight);
+  --cast: var(--shadow-panel); border-top: 2px solid var(--btn-highlight);
 }
 .upload-progress__label { font-weight: 600; margin-bottom: 0.85rem; }
 .upload-progress__track { height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
@@ -808,19 +888,77 @@ body.page-admin #main, body.page-deck-edit #main {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* --- team --- */
-.mission { padding: 3rem 0 1rem; }
-.team { padding: 1rem 0 3rem; }
-.team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--gap); margin-top: 1.5rem; }
-.team-card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 1.25rem; text-align: center; box-shadow: var(--shadow);
+/* --- mission --- */
+/* Centered, with a larger heading; the statement stays on one line (desktop). */
+.mission { padding: 3.5rem 0 1.5rem; text-align: center; }
+.mission .prose { max-width: none; }
+.mission .prose h2 { font-size: clamp(2rem, 4.5vw, 3rem); margin: 0 0 0.75rem; }
+.mission .prose p { white-space: nowrap; margin: 0; }
+/* …but allow it to wrap on narrow screens where one line can't fit. */
+@media (max-width: 820px) { .mission .prose p { white-space: normal; } }
+/* Contact page: the email shown prominently. */
+.contact-email { font-size: clamp(1.4rem, 4vw, 2rem); font-weight: 700; margin: 0 0 1rem; }
+.contact-email a { color: var(--accent-2); }
+/* Full-width fading divider between the mission and the team (matches the team's
+   break-out width so it lines up with the cards). */
+.section-rule {
+  position: relative; left: 50%;
+  width: min(1340px, 94vw);
+  margin: 1.5rem calc(min(1340px, 94vw) / -2) 0;
+  height: 2px;
+  background: linear-gradient(to right, transparent, var(--btn-highlight) 14%, var(--btn-highlight) 86%, transparent);
+  opacity: 0.4;
 }
-.team-card__img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin: 0 auto 1rem; }
+
+/* --- team --- */
+.team { padding: 1.5rem 0 3rem; }
+/* The team section breaks out of the narrow content wrap so four full-width cards
+   fit on one row; auto-fit then wraps only when the window is too narrow for them. */
+.team {
+  position: relative; left: 50%;
+  width: min(1340px, 94vw);
+  margin-left: calc(min(1340px, 94vw) / -2);
+}
+.team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: var(--gap); margin-top: 1.5rem; }
+.team-card {
+  position: relative;
+  /* glass: tinted translucent + blur, screen-blend top rim (::before), panel shadow */
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
+  border-radius: 24px;
+  padding: 1.5rem; text-align: center; --cast: var(--shadow-panel);
+}
+/* Public card: column flex so the LinkedIn button can pin to the bottom (cards in a
+   row stretch to equal height via the grid, so every button lands at the same spot). */
+.team-card:not(.is-editing) { display: flex; flex-direction: column; align-items: center; }
+/* Avatar wrapper carries the glass top-rim highlight (a circular element can't get
+   one from a plain <img>); the screen-blended top border reads as a glass edge. */
+.team-card__avatar { position: relative; width: 120px; height: 120px; margin: 0 auto 0.5rem; border-radius: 50%; }
+.team-card__avatar::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  /* border-top ONLY (like .btn::before) so the rim tapers to nothing toward the
+     circle's halfway point — not an all-sides border with hard diagonal cuts. */
+  border-top: 3px solid var(--btn-highlight);
+  mix-blend-mode: screen; opacity: 0.6;
+}
+.team-card__img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin: 0 auto 0.5rem; }
+.team-card__avatar .team-card__img { margin: 0; display: block; } /* wrapper owns the spacing */
 .team-card__img--empty { background: var(--bg-elev); }
-.team-card__name { margin: 0.25rem 0; font-size: 1.2rem; }
-.team-card__role { margin: 0 0 0.75rem; color: var(--accent-2); font-weight: 600; }
-.team-card__desc { color: var(--fg-muted); font-size: 0.95rem; }
+/* Fading divider rule (fades out toward both ends); the name sits between two. */
+.team-card__rule {
+  width: 100%; height: 2px; margin: 0.65rem 0; flex: none;
+  background: linear-gradient(to right, transparent, var(--btn-highlight) 22%, var(--btn-highlight) 78%, transparent);
+  opacity: 0.45;
+}
+.team-card__name { margin: 0.1rem 0; font-size: 1.2rem; white-space: nowrap; }
+.team-card__role { margin: 0.5rem 0 0.75rem; color: var(--accent-2); font-weight: 600; }
+.team-card__desc { color: var(--fg-muted); font-size: 0.95rem; margin: 0 0 1.1rem; }
+/* LinkedIn = a round logo button pinned to the card bottom. */
+.team-card:not(.is-editing) .btn--linkedin {
+  margin-top: auto; padding: 0; width: 46px; height: 46px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.team-card__li { width: 22px; height: 22px; display: block; }
 .team-card.is-editing input, .team-card.is-editing textarea { width: 100%; margin: 0.35rem 0; text-align: center; }
 .team-card__imgbtn { background: none; border: none; cursor: pointer; padding: 0; position: relative; }
 .team-card__imghint { display: block; font-size: 0.8rem; color: var(--accent-2); }
@@ -874,10 +1012,20 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 /* --- other games list --- */
 .other-games { padding: 1rem 1.25rem 3rem; }
 .game-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 1rem; }
-.game-list a { background: var(--bg-card); border: 1px solid var(--border); padding: 0.75rem 1.25rem; border-radius: var(--radius-sm); color: var(--fg); }
+.game-list a {
+  position: relative;
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: var(--blur-md); backdrop-filter: var(--blur-md);
+  padding: 0.75rem 1.25rem; border-radius: var(--radius-sm); color: var(--fg); --cast: var(--shadow);
+}
 
 /* --- press flow --- */
-.press-request { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin: 2rem 0; }
+.press-request {
+  position: relative;
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
+  border-radius: 24px; padding: 1.5rem; margin: 2rem 0; --cast: var(--shadow-panel);
+}
 .press-type-choice { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
 .press-form__actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
 .press-form__status { margin-top: 1rem; }
@@ -1143,14 +1291,14 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 .theme-toggle {
   position: fixed; bottom: 1.25rem; left: 1.25rem; z-index: 60;
   width: 52px; height: 52px; border-radius: var(--radius-pill);
-  background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow);
+  background: var(--bg-card); border: 1px solid var(--border); --cast: var(--shadow);
   font-size: 1.5rem; cursor: pointer; line-height: 1;
 }
 .theme-toggle:hover { border-color: var(--accent); transform: translateY(-2px); }
 .theme-panel {
   position: fixed; bottom: 5.5rem; left: 1.25rem; z-index: 60; width: 280px;
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow); padding: 1rem;
+  --cast: var(--shadow); padding: 1rem;
 }
 .theme-panel[hidden] { display: none; }
 .theme-panel__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
@@ -1191,7 +1339,7 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
     background: rgba(13, 48, 74, 0.42);
     -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
     border-radius: 28px;
-    box-shadow: var(--shadow-panel);
+    --cast: var(--shadow-panel);
     /* Collapsed by default (base sets display:none); .is-open reveals it. */
   }
   .site-nav-drop.is-open { display: flex; }

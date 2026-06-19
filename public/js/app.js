@@ -227,6 +227,175 @@
     update();
   })();
 
+  // --- Drifting paw field ---------------------------------------------------
+  // A 45°-rotated (diamond) lattice of paw prints that constantly drifts across
+  // the page behind the content. Each paw is the PawGradient image run through the
+  // #pawThreshold SVG filter; its Photoshop-style threshold is set by pre-multiplying
+  // CSS brightness (b = 127.5 / T). At rest T = 220 (just the brightest specks show);
+  // near the cursor we lerp T → 40 (the whole paw reveals), and back to 220 as the
+  // cursor leaves. Lives on <body>, so it's wired once and survives soft-nav.
+  (function pawField() {
+    const field = document.querySelector('[data-paw-field]');
+    if (!field) return;
+
+    const finePointer = !window.matchMedia || window.matchMedia('(pointer: fine)').matches;
+    const mobile = !finePointer;   // touch device → fewer paws + no hero layer (perf)
+    const S = mobile ? 300 : 190;  // lattice pitch (px); larger on mobile = far fewer paws
+    const R = 100;                 // cursor in-range radius (px) — binary check, not a gradient
+    const bForT = (T) => 127.5 / Math.max(T, 1); // PS threshold T → brightness pre-multiply (T→0 ⇒ full paw)
+    // Resting (out of range) each paw is a dot (threshold 220); within R it eases to
+    // a full paw (threshold 40). Blooming to a paw is fast; collapsing back is slow.
+    const T_REST = 220, T_NEAR = 40;
+    const EASE_IN = 0.22;          // ease toward the full paw — fast
+    const EASE_OUT = 0.035;        // ease back to a dot — much slower
+    const PAW_SRC = field.dataset.pawSrc || '/img/paw.png';
+
+    // Keep the SVG filter's flood colour in sync with the live --bg (top colour).
+    const flood = document.querySelector('[data-paw-flood]');
+    function syncColor() {
+      if (!flood) return;
+      const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+      if (bg) flood.setAttribute('flood-color', bg);
+    }
+
+    // Diagonal drift velocity (px/s). Slow, so it reads as a gentle constant flow.
+    const vx = 9, vy = 6;
+    const t0 = performance.now();
+    const R2 = R * R;          // compare squared distance — skip the per-paw sqrt
+    const DOT_T = T_REST - 30; // threshold at/above which a collapsing paw reads as a plain dot
+    const HOLD = 1000;         // ms to hold the full paw after the cursor leaves range
+    const ROT_LERP = 0.12;     // per-frame rotation ease (~0.4s) when re-aiming
+    const mod = (v, m) => ((v % m) + m) % m;
+    const shortAngle = (a) => ((a + 180) % 360 + 360) % 360 - 180; // → [-180,180)
+
+    // A "surface" = one container holding a drifting lattice of paws. There is the
+    // global fixed field (behind the page) and — whenever a hero is on the page — a
+    // hero-local layer masked to the hero's fade. Both share one loop so their drift
+    // and cursor reveal stay in sync.
+    function makeSurface(el, fixed) {
+      return { el, fixed, paws: [], LW: 0, LH: 0, builtW: 0, builtH: 0 };
+    }
+    function buildSurface(s) {
+      s.el.textContent = '';
+      s.paws = [];
+      const r = s.el.getBoundingClientRect();
+      const W = Math.max(1, r.width), H = Math.max(1, r.height);
+      s.builtW = W; s.builtH = H;
+      // Tile whole S-periods so the lattice wraps seamlessly (LW/LH multiples of S).
+      // Margin periods so ordinary growth never forces a rebuild (smaller on mobile).
+      const M = mobile ? 2 : 3;
+      const NX = Math.ceil(W / S) + M, NY = Math.ceil(H / S) + M;
+      s.LW = NX * S; s.LH = NY * S;
+      const frag = document.createDocumentFragment();
+      for (let ry = 0; ry < 2 * NY; ry++) {   // 2 lattice rows per vertical period S
+        const by = ry * (S / 2);
+        const off = (ry & 1) ? S / 2 : 0;     // alternate-row half-shift → 45° lattice
+        for (let cx = 0; cx < NX; cx++) {
+          const bx = cx * S + off;
+          const img = document.createElement('img');
+          img.className = 'paw';
+          img.src = PAW_SRC;
+          img.alt = '';
+          img.decoding = 'async';
+          img.style.setProperty('--b', bForT(T_REST).toFixed(3));
+          img.style.transform = `translate(${bx}px, ${by}px) translate(-50%, -50%)`;
+          frag.appendChild(img);
+          s.paws.push({ el: img, bx, by, T: T_REST, inR: false, rotated: false, leftAt: 0, rotC: 0, rotT: 0 });
+        }
+      }
+      s.el.appendChild(frag);
+    }
+
+    const globalSurf = makeSurface(field, true);
+    const surfaces = [globalSurf];
+    buildSurface(globalSurf);
+
+    // Cursor state (client coords). active flips off when the pointer leaves. dirDeg
+    // tracks the cursor's travel direction so a paw can aim its "up" axis along it on
+    // entering range. atan2(dx, -dy): 0° = up (the paw's natural orientation).
+    let mx = 0, my = 0, active = false, dirDeg = 0, lastX = null, lastY = null;
+    if (finePointer) {
+      window.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') return;
+        if (lastX != null) {
+          const ddx = e.clientX - lastX, ddy = e.clientY - lastY;
+          if (ddx * ddx + ddy * ddy > 4) dirDeg = Math.atan2(ddx, -ddy) * 180 / Math.PI;
+        }
+        lastX = e.clientX; lastY = e.clientY;
+        mx = e.clientX; my = e.clientY; active = true;
+      }, { passive: true });
+      window.addEventListener('pointerleave', () => { active = false; });
+      document.addEventListener('mouseleave', () => { active = false; });
+    }
+
+    let raf = null;
+    function loop() {
+      const now = performance.now();
+      const t = (now - t0) / 1000;
+      const ox = t * vx, oy = t * vy;   // continuous drift offset (never reset → no global jump)
+      for (let si = 0; si < surfaces.length; si++) {
+        const s = surfaces[si];
+        for (let i = 0; i < s.paws.length; i++) {
+          const p = s.paws[i];
+          // Per-paw wrapped position: each paw drifts smoothly and only ever wraps
+          // while OFF-SCREEN, so the on-screen pattern (and any bloomed paw) never jumps.
+          const px = mod(p.bx + ox + S, s.LW) - S;
+          const py = mod(p.by + oy + S, s.LH) - S;
+          // Binary in-range test: within R → full paw (40), else → dot (220).
+          let inR = false;
+          if (active) {
+            const ex = mx - px, ey = my - py;
+            inR = ex * ex + ey * ey < R2;
+          }
+          // On entering range, aim the paw's up-axis along the cursor's travel. A fresh
+          // dot snaps; one still carrying a rotation eases to the new heading (~0.4s).
+          if (inR && !p.inR) {
+            p.rotT = dirDeg;
+            if (!p.rotated) p.rotC = dirDeg;
+            p.rotated = true;
+          }
+          // Target threshold, with a 1s hold at full paw before collapsing back.
+          let targetT;
+          if (inR) { targetT = T_NEAR; p.leftAt = 0; }
+          else { if (p.inR) p.leftAt = now; targetT = (p.leftAt && now - p.leftAt < HOLD) ? T_NEAR : T_REST; }
+          p.inR = inR;
+          const ease = targetT < p.T ? EASE_IN : EASE_OUT; // toward paw = fast, toward dot = slow
+          let nt = p.T + (targetT - p.T) * ease;
+          if (Math.abs(targetT - nt) < 0.5) nt = targetT; // settle exactly on target
+          if (nt !== p.T) { p.T = nt; p.el.style.setProperty('--b', bForT(nt).toFixed(3)); }
+          // Once back to a plain dot, drop the rotated flag so the next bloom SNAPS.
+          if (!inR && p.rotated && p.T >= DOT_T) p.rotated = false;
+          // Ease the rotation toward its target (shortest way around).
+          if (p.rotC !== p.rotT) {
+            const d = shortAngle(p.rotT - p.rotC);
+            p.rotC = Math.abs(d) < 0.5 ? p.rotT : p.rotC + d * ROT_LERP;
+          }
+          p.el.style.transform =
+            `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px) translate(-50%, -50%) rotate(${p.rotC.toFixed(1)}deg)`;
+        }
+      }
+      raf = requestAnimationFrame(loop);
+    }
+
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        // Only rebuild a surface when it has GROWN past its built coverage. Shrinking,
+        // the mobile URL bar, and minor changes keep the existing lattice — so the
+        // paws never jarringly reset.
+        for (const s of surfaces) {
+          const r = s.el.getBoundingClientRect();
+          if (r.width > s.builtW + S || r.height > s.builtH + S) buildSurface(s);
+        }
+      }, 300);
+    });
+
+    syncColor();
+    if (reduceMotion) return; // static field, no drift/bloom
+    raf = requestAnimationFrame(loop);
+  })();
+
   // --- Custom video player --------------------------------------------------
   // Our own play/pause UI for every video on the site (pitch-deck slides + page
   // sections). The <iframe>/<video> is built lazily on first play and driven via

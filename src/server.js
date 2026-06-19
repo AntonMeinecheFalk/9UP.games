@@ -59,6 +59,7 @@ app.use(editModeMiddleware);
 const assetOpts = { maxAge: 0, etag: true, lastModified: true };
 app.use('/css', express.static(path.join(ROOT, 'public/css'), assetOpts));
 app.use('/js', express.static(path.join(ROOT, 'public/js'), assetOpts));
+app.use('/img', express.static(path.join(ROOT, 'public/img'), assetOpts));
 
 registerRoutes(app);
 

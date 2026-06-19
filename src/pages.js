@@ -145,6 +145,8 @@ export function renderAbout(editMode) {
       </div>
     </section>
 
+    <div class="section-rule" aria-hidden="true"></div>
+
     <section class="team">
       <h2>Team</h2>
       ${
@@ -175,6 +177,7 @@ export function renderContact(editMode) {
   const body = `<div class="wrap">
     <h1>Contact</h1>
     <section class="contact-page">
+      <p class="contact-email"><a href="mailto:contact@9up.games">contact@9up.games</a></p>
       <div class="richtext-wrap">
         ${
           editMode
@@ -192,7 +195,7 @@ export function renderContact(editMode) {
                </div>`
             : contact
               ? `<div class="prose">${contact}</div>`
-              : '<p class="muted">Contact details coming soon.</p>'
+              : ''
         }
       </div>
     </section>

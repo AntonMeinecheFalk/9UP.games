@@ -315,7 +315,7 @@ export const Submissions = {
 // Editors can recolor and re-font the whole site. Stored as one JSON blob;
 // rendered into a <style> that overrides the CSS custom properties.
 export const THEME_COLOR_KEYS = [
-  'bg', 'surface', 'text', 'muted', 'border', 'accent', 'accent2', 'btnHighlight', 'btnShadow',
+  'bg', 'bg2', 'surface', 'text', 'muted', 'border', 'accent', 'accent2', 'btnHighlight', 'btnShadow',
 ];
 export const THEME_FONT_KEYS = ['headingFont', 'bodyFont'];
 // Back-compat alias (older code referenced THEME_KEYS for the colour pickers).
@@ -342,6 +342,7 @@ export function fontById(id) {
 
 export const DEFAULT_THEME = {
   bg: '#0e0f13',
+  bg2: '#0e0f13',          // page background gradient bottom; defaults to bg (flat)
   surface: '#1b1e27',
   text: '#e8eaf0',
   muted: '#9aa0ad',
@@ -384,7 +385,11 @@ export const Site = {
     } catch {
       t = {};
     }
-    return { ...DEFAULT_THEME, ...t };
+    const merged = { ...DEFAULT_THEME, ...t };
+    // A theme saved before the gradient feature has no bg2 — mirror bg so the
+    // background stays flat until an editor explicitly picks a secondary colour.
+    if (t.bg2 === undefined) merged.bg2 = merged.bg;
+    return merged;
   },
   setTheme: (partial) => {
     const next = { ...Site.theme(), ...(partial || {}) };

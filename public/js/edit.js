@@ -222,6 +222,18 @@
       catch (err) { fail(err); }
     });
   });
+  // Team member fields auto-save on blur/change (same as the fields above), so a
+  // filled-in card persists even if the explicit "Save member" button is missed.
+  document.querySelectorAll('[data-member-field]').forEach((el) => {
+    el.addEventListener('change', async () => {
+      const card = el.closest('[data-member-id]');
+      if (!card) return;
+      try {
+        await api('PATCH', `/api/team/${card.dataset.memberId}`, { [el.dataset.memberField]: el.value });
+        flash('Member saved');
+      } catch (err) { fail(err); }
+    });
+  });
 
   // --- Elevator pitch: click-to-edit. The pitch shows the real prose (identical
   // to public) until clicked, so the layout stays WYSIWYG while moving the logo.
@@ -448,7 +460,9 @@
           break;
         }
         case 'member-save': {
-          const card = btn.closest('[data-member-id]');
+          // Scope to the article, not the button — the button itself carries
+          // data-member-id, so a bare [data-member-id] closest() returns it.
+          const card = btn.closest('.team-card[data-member-id]');
           const fields = {};
           card.querySelectorAll('[data-member-field]').forEach((f) => { fields[f.dataset.memberField] = f.value; });
           await api('PATCH', `/api/team/${card.dataset.memberId}`, fields);
@@ -499,6 +513,7 @@
   // Maps a palette key to the CSS custom properties it drives.
   const THEME_VARS = {
     bg: ['--bg'],
+    bg2: ['--bg2'],
     surface: ['--bg-card', '--bg-elev'],
     text: ['--fg'],
     muted: ['--fg-muted'],
