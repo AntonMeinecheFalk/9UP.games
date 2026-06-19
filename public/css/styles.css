@@ -177,7 +177,7 @@ body.page-admin #main, body.page-deck-edit #main {
    in) so there's no dead-stop between the circle and the widen. Each element
    sets its own --pill-h; the collapsed pill is a circle of that diameter. */
 .site-nav a {
-  --pill-h: 2.4rem; margin-left: 2.75rem;
+  --pill-h: 2.4rem; margin-left: 1.8rem;
   position: relative; z-index: 0;
   display: inline-flex; align-items: center; height: var(--pill-h);
   padding: 0 1.1rem; border-radius: var(--radius-pill);
@@ -302,6 +302,12 @@ body.page-admin #main, body.page-deck-edit #main {
   position: absolute; box-sizing: border-box; pointer-events: none;
   border: 3px solid var(--btn-highlight, #fff);
 }
+/* The video play arrow's shockwave is a rounded-triangle ring instead of a box
+   (corner circles at the triangle's points joined by tangent lines); app.js drives
+   its growth/fade by rewriting the path. */
+/* Width is animated per-frame in app.js (thins as it travels) — leaving it out of
+   CSS so the stylesheet doesn't override the live stroke-width. */
+.shockwave-tri path { fill: none; stroke: var(--btn-highlight, #fff); }
 
 @media (prefers-reduced-motion: reduce) {
   .btn { transition: filter 0.2s ease, transform 0.2s ease; }
@@ -592,33 +598,135 @@ body.page-admin #main, body.page-deck-edit #main {
   .carousel__next { right: 0.5rem; }
 }
 
-/* --- video --- */
-.video-frame { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: var(--radius); overflow: hidden; }
-.video-frame iframe, .video-frame video, .video-frame img { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.video-frame img { object-fit: cover; }
-/* Video thumbnail (click-to-play) with a glass play button. */
-.video-thumb { cursor: pointer; }
-.video-play {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: 76px; height: 76px; border-radius: 50%; border: none; cursor: pointer;
-  background: rgba(255, 255, 255, 0.16); -webkit-backdrop-filter: var(--blur-sm); backdrop-filter: var(--blur-sm);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35); transition: transform 0.2s ease, background 0.2s ease;
+/* --- custom video player ----------------------------------------------------
+   Self-hosted videos only (uploaded + transcoded to a streamable MP4 — no
+   third-party embeds). The <video> is injected by JS (app.js → videoPlayers)
+   with NO native controls; a click-catching cover sits over it and our glass
+   play/pause toggle is the only control. */
+/* `isolation` contains the media/poster/cover z-layers within the frame so the
+   poster sits at the VIDEO's depth in the slide stack (not floating above other
+   blocks). Only the slide-level toggle (.video-toggle--slide) renders on top. */
+.video-frame { position: relative; isolation: isolate; aspect-ratio: 16 / 9; background: #000; border-radius: var(--radius); overflow: hidden; }
+.video-frame video, .video-frame img { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-frame video { object-fit: contain; }
+.video-frame__media { position: absolute; inset: 0; z-index: 0; }
+.video-frame__poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; transition: opacity 0.3s ease; }
+.video-frame--fill .video-frame__poster { object-fit: contain; }
+.video-frame__poster--blank { background: #000; }
+/* The poster covers the video until playback first starts, then lifts to reveal it. */
+.video-frame.is-started .video-frame__poster { opacity: 0; }
+/* Optional decorative overlay image: sits over the video, then slides out the
+   bottom (clipped to the frame's rounded box by overflow:hidden) once playback
+   starts — same ease-in feel as the deck-open panel slide. */
+.video-frame__overlay {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2;
+  pointer-events: none; transform: translateY(0);
+  transition: transform 0.6s cubic-bezier(0.5, 0, 0.7, 0.25);
 }
-.video-play::before {
-  content: ""; position: absolute; top: 50%; left: 54%; transform: translate(-50%, -50%);
-  border-style: solid; border-width: 13px 0 13px 21px; border-color: transparent transparent transparent #fff;
+.video-frame.is-started .video-frame__overlay { transform: translateY(103%); }
+@media (prefers-reduced-motion: reduce) {
+  .video-frame__overlay { transition: opacity 0.3s ease; }
+  .video-frame.is-started .video-frame__overlay { transform: none; opacity: 0; }
 }
-.video-thumb:hover .video-play { background: #fff; transform: translate(-50%, -50%) scale(1.06); }
-.video-thumb:hover .video-play::before { border-left-color: rgba(15, 22, 38, 0.7); }
-/* Our own video controls (replace the platform chrome). */
-.deck-video__close, .deck-video__pp {
-  position: absolute; z-index: 4; border: none; cursor: pointer; color: #fff; line-height: 1;
-  background: rgba(255, 255, 255, 0.16); -webkit-backdrop-filter: var(--blur-sm); backdrop-filter: var(--blur-sm); border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; transition: background 0.2s ease;
+/* Transparent overlay that swallows all pointer events so the user can never
+   reach (and thus never reveal) the platform's own controls. */
+.video-frame__cover { position: absolute; inset: 0; z-index: 3; cursor: pointer; }
+
+/* Glass play/pause toggle — NO disc: the play triangle / pause bars ARE the glass.
+   Each shape is a frosted child element: a translucent white fill + its own backdrop
+   blur, so the video behind it is actually frosted like every other glass element on
+   the site, turning solid white on hover. The play triangle is cut with a polygon
+   clip-path; the pause is two rounded bars. (Why per-shape children rather than one
+   masked/clipped pseudo: `clip-path: url(#svg)` and `mask` BOTH stop backdrop-filter
+   from compositing in Chrome — only a polygon clip-path and plain rounded rects keep
+   the blur.) */
+.video-toggle {
+  /* Centre with the `translate` property (not inside `transform`) so the click
+     bounce's `scale` pivots around the true centre, not the bottom-right corner. */
+  position: absolute; top: 50%; left: 50%; translate: -50% -50%; transform: scale(1);
+  width: var(--vt-size, 84px); height: var(--vt-size, 84px); z-index: 3;
+  border: none; cursor: pointer; pointer-events: auto; background: none;
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
 }
-.deck-video__close:hover, .deck-video__pp:hover { background: rgba(255, 255, 255, 0.34); }
-.deck-video__close { top: 14px; right: 14px; width: 42px; height: 42px; font-size: 1.05rem; }
-.deck-video__pp { bottom: 18px; left: 50%; transform: translateX(-50%); width: 54px; height: 54px; font-size: 1.1rem; }
+/* Auto-hidden while the video plays (idle pointer / pointer left the frame). */
+.video-toggle.is-hidden { opacity: 0; pointer-events: none; }
+/* Shared frosted-glass fill for both shapes; solid white on hover/focus. */
+.video-toggle__play::before, .video-toggle__pause i {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.14) 70%, rgba(255, 255, 255, 0.2));
+  -webkit-backdrop-filter: var(--blur-md); backdrop-filter: var(--blur-md);
+  transition: background 0.2s ease;
+}
+.video-toggle:hover .video-toggle__play::before, .video-toggle:focus-visible .video-toggle__play::before,
+.video-toggle:hover .video-toggle__pause i, .video-toggle:focus-visible .video-toggle__pause i {
+  background: #fff;
+}
+/* Play: the rounded-triangle clip is on the span; the blurred fill is its ::before so
+   the parent's clip-path crops the child's painted blur to the triangle (a backdrop-filter
+   on the clipped element itself either blurs the whole square box or, with clip-path: url(),
+   renders no blur at all — only the parent-crops-child route both blurs AND rounds). */
+.video-toggle__play {
+  position: absolute; inset: 0; clip-path: url(#vt-clip-play);
+  --vt-tri: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%23fff' d='M16.3 13.99 Q16.3 10.22 18.7 12.17 L36 22.18 Q38.4 24 36 25.82 L18.7 35.83 Q16.3 37.78 16.3 34.01 Z'/%3E%3C/svg%3E");
+}
+.video-toggle__play::before { content: ""; position: absolute; inset: 0; }
+/* Rim-light: the triangle MINUS a copy nudged down = just the top contour edge, the
+   same screen-blend highlight every other glass element carries. */
+.video-toggle__play::after {
+  content: ""; position: absolute; inset: 0;
+  -webkit-mask-image: var(--vt-tri), var(--vt-tri); mask-image: var(--vt-tri), var(--vt-tri);
+  -webkit-mask-repeat: no-repeat, no-repeat; mask-repeat: no-repeat, no-repeat;
+  -webkit-mask-size: contain, contain; mask-size: contain, contain;
+  -webkit-mask-position: 50% 50%, 50% calc(50% + 3px); mask-position: 50% 50%, 50% calc(50% + 3px);
+  -webkit-mask-composite: source-out; mask-composite: subtract;
+  background: var(--btn-highlight); mix-blend-mode: screen; opacity: 0.95;
+}
+/* Pause: two frosted rounded bars, each with a screen-blend top rim like other glass. */
+.video-toggle__pause { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; gap: 11px; }
+.video-toggle__pause i {
+  display: block; width: 15px; height: 50%; border-radius: 7px;
+  border-top: 2px solid var(--btn-highlight);
+}
+.video-toggle.is-playing .video-toggle__play { display: none; }
+.video-toggle.is-playing .video-toggle__pause { display: flex; }
+.video-toggle:hover, .video-toggle:focus-visible { transform: scale(1.14); }
+@media (prefers-reduced-motion: reduce) { .video-toggle { transition: none; } }
+
+/* Scrubber — a thin black track pinned to the bottom of the frame with a glass
+   playhead. Fades with the toggle (.is-hidden, same auto-hide rules in app.js). The
+   container is click-through; only the track (a taller transparent hit area around the
+   visible line) and the playhead catch the pointer. */
+.video-scrub {
+  position: absolute; left: 0; right: 0; bottom: 14px; z-index: 4;
+  padding: 0 18px; pointer-events: none; transition: opacity 0.3s ease;
+}
+.video-scrub.is-hidden { opacity: 0; pointer-events: none; }
+.video-scrub__track {
+  position: relative; height: 16px; display: flex; align-items: center;
+  pointer-events: auto; cursor: pointer; touch-action: none;
+}
+.video-scrub__line { width: 100%; height: 4px; border-radius: var(--radius-pill); background: rgba(0, 0, 0, 0.65); }
+/* Playhead = the same glass circle as .glass-arrow: frosted + rim, solid white and
+   bigger on hover/drag. */
+.video-scrub__head {
+  position: absolute; top: 50%; left: 0; translate: -50% -50%; transform: scale(1);
+  width: 15px; height: 15px; border: none; padding: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: var(--blur-md); backdrop-filter: var(--blur-md);
+  cursor: grab; pointer-events: auto;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease;
+}
+.video-scrub__head::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  border-top: 2px solid var(--btn-highlight); mix-blend-mode: screen; opacity: 0.7;
+}
+/* The playhead reads as "hovered" (white + grown) whenever the pointer is over any
+   part of the track, not just the dot itself. */
+.video-scrub__head:hover, .video-scrub__head:focus-visible, .video-scrub__head:active,
+.video-scrub__track:hover .video-scrub__head {
+  background: #fff; transform: scale(1.4);
+}
+.video-scrub__head:active { cursor: grabbing; }
+@media (prefers-reduced-motion: reduce) { .video-scrub, .video-scrub__head { transition: none; } }
 /* Editor thumbnail preview. */
 .block-video__thumb { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
 .block-video__thumbpreview {
@@ -627,7 +735,78 @@ body.page-admin #main, body.page-deck-edit #main {
 }
 .block-video__thumbpreview img { width: 100%; height: 100%; object-fit: cover; }
 .video-edit { margin-top: 1rem; padding: 1rem; background: var(--bg-elev); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.75rem; }
+.video-edit__file { display: flex; align-items: center; gap: 0.5rem; }
+.block-video__preview, .block-video__state video { max-width: 320px; width: 100%; border-radius: 8px; background: #000; }
 .seg { display: flex; gap: 1rem; }
+
+/* --- upload progress overlay (edit mode) ---------------------------------- */
+.upload-progress {
+  position: fixed; inset: 0; z-index: 4000; display: none; align-items: center; justify-content: center;
+  background: rgba(var(--bg-rgb), 0.55); -webkit-backdrop-filter: var(--blur-sm); backdrop-filter: var(--blur-sm);
+}
+.upload-progress.is-open { display: flex; }
+.upload-progress__card {
+  width: min(440px, 88vw); padding: 1.4rem 1.5rem; border-radius: 18px; color: var(--text);
+  background: rgba(var(--bg-rgb), 0.92); -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
+  box-shadow: var(--shadow-panel); border-top: 2px solid var(--btn-highlight);
+}
+.upload-progress__label { font-weight: 600; margin-bottom: 0.85rem; }
+.upload-progress__track { height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+.upload-progress__fill {
+  height: 100%; width: 0; border-radius: 999px; transition: width 0.15s ease;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
+.upload-progress__pct { margin-top: 0.6rem; font-size: 0.95rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.upload-progress.is-error .upload-progress__fill { background: #c0392b; }
+.upload-progress.is-error .upload-progress__pct { color: #ff8a7a; }
+
+/* --- media library picker (edit mode) ------------------------------------- */
+/* Reuse an already-uploaded asset (or upload a new one) instead of re-uploading. */
+.media-picker {
+  position: fixed; inset: 0; z-index: 5000; display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem; background: rgba(var(--bg-rgb), 0.6);
+  -webkit-backdrop-filter: var(--blur-sm); backdrop-filter: var(--blur-sm);
+}
+.media-picker__panel {
+  width: min(940px, 100%); max-height: 85vh; display: flex; flex-direction: column; overflow: hidden;
+  background: rgba(var(--bg-rgb), 0.92); border-radius: var(--radius); box-shadow: var(--shadow-panel);
+  border-top: 2px solid var(--btn-highlight);
+  -webkit-backdrop-filter: var(--blur-lg); backdrop-filter: var(--blur-lg);
+}
+.media-picker__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border);
+}
+.media-picker__head strong { font-size: 1.1rem; text-transform: capitalize; }
+.media-picker__head-actions { display: flex; align-items: center; gap: 0.6rem; }
+.media-picker__grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.85rem; padding: 1.25rem; overflow-y: auto;
+}
+.media-picker__grid .muted { grid-column: 1 / -1; }
+.media-picker__item {
+  position: relative; display: flex; flex-direction: column; padding: 0; cursor: pointer; text-align: left;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-elev);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.media-picker__item:hover, .media-picker__item:focus-visible {
+  border-color: var(--btn-highlight); transform: translateY(-2px);
+}
+.media-picker__thumb { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block; background: #000; }
+.media-picker__thumb--blank { display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+.media-picker__badge {
+  position: absolute; top: 6px; left: 6px; width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #fff;
+  background: rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: var(--blur-sm); backdrop-filter: var(--blur-sm);
+}
+.media-picker__proc {
+  position: absolute; top: 6px; right: 6px; padding: 2px 7px; border-radius: 999px;
+  font-size: 0.62rem; font-weight: 700; color: #fff; background: rgba(0, 0, 0, 0.62);
+}
+.media-picker__name {
+  padding: 0.4rem 0.5rem 0.5rem; font-size: 0.74rem; font-weight: 600; color: var(--fg-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* --- team --- */
 .mission { padding: 3rem 0 1rem; }
@@ -904,8 +1083,12 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 .slide-block { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .slide-block--image img { width: 100%; height: 100%; object-fit: contain; margin: 0; pointer-events: auto; }
 .slide-block--buttons a { pointer-events: auto; }
-/* Video slides have no player UI for now (custom UI to come), so the frame is
-   inert — it inherits pointer-events:none from .slide-block. */
+/* The video frame itself inherits pointer-events:none from .slide-block; its
+   click-catching cover re-enables them so play/pause works. The glass toggle is
+   lifted OUT of the block order to a slide-level element (.video-toggle--slide)
+   so it's the top layer no matter where the video block sits. */
+.slide-block--video .video-frame__cover { pointer-events: auto; }
+.video-toggle--slide { z-index: 20; --vt-size: 96px; pointer-events: auto; }
 .deck-slide__bg { pointer-events: none; }
 .slide-block--text { color: #fff; text-align: center; flex-direction: column; padding: 0 10vw; }
 .slide-block--buttons { gap: 1rem; flex-wrap: wrap; }

@@ -23,6 +23,7 @@ import {
   upload,
   registerUpload,
   getMedia,
+  listMedia,
   deleteMedia,
   updateAlt,
   resolveMediaPath,
@@ -32,6 +33,7 @@ import { sendSubmissionEmail } from './email.js';
 import {
   renderHome,
   renderAbout,
+  renderContact,
   renderPressKit,
   renderGamePage,
   renderGamesPage,
@@ -66,12 +68,9 @@ function sanitizeSectionData(type, raw) {
           .filter((img) => img.mediaId && getMedia(img.mediaId)),
       };
     case 'video': {
-      const mode = data.mode === 'file' ? 'file' : 'url';
-      return {
-        mode,
-        url: mode === 'url' ? String(data.url || '').slice(0, 2000) : '',
-        mediaId: mode === 'file' ? intOrNull(data.mediaId) : null,
-      };
+      // Self-hosted uploads only (no embeds).
+      const mediaId = intOrNull(data.mediaId);
+      return { mediaId: mediaId && getMedia(mediaId) ? mediaId : null };
     }
     case 'buttons':
       return {
@@ -111,15 +110,17 @@ function sanitizeBlocks(rawBlocks) {
               .filter((x) => x.label || x.url),
           };
         case 'video': {
-          const mode = b.mode === 'file' ? 'file' : 'url';
+          // Self-hosted uploads only (no embeds): keep the uploaded video + optional
+          // manual thumbnail + optional slide-away overlay image, dropping references
+          // to media that no longer exists.
           const mediaId = intOrNull(b.mediaId);
           const thumbId = intOrNull(b.thumbId);
+          const overlayId = intOrNull(b.overlayId);
           return {
             type: 'video',
-            mode,
-            url: mode === 'url' ? String(b.url || '').slice(0, 2000) : '',
-            mediaId: mode === 'file' && mediaId && getMedia(mediaId) ? mediaId : null,
+            mediaId: mediaId && getMedia(mediaId) ? mediaId : null,
             thumbId: thumbId && getMedia(thumbId) ? thumbId : null,
+            overlayId: overlayId && getMedia(overlayId) ? overlayId : null,
           };
         }
         default:
@@ -149,6 +150,7 @@ export function registerRoutes(app) {
   app.get('/', (req, res) => sendHtml(res, renderHome(req.editMode)));
   app.get('/games', (req, res) => sendHtml(res, renderGamesPage(req.editMode)));
   app.get('/about', (req, res) => sendHtml(res, renderAbout(req.editMode)));
+  app.get('/contact', (req, res) => sendHtml(res, renderContact(req.editMode)));
   app.get('/press', (req, res) => sendHtml(res, renderPressKit(req.editMode)));
 
   app.get('/game/:slug', (req, res, next) => {
@@ -327,6 +329,7 @@ export function registerRoutes(app) {
     }
     if ('site_title' in req.body) Site.setTitle(String(req.body.site_title || '').slice(0, 200));
     if ('mission' in req.body) Site.setMission(sanitizeRichHtml(req.body.mission || ''));
+    if ('contact' in req.body) Site.setContact(sanitizeRichHtml(req.body.contact || ''));
     if ('parallax' in req.body) Site.setParallax(req.body.parallax);
     if ('site_logo' in req.body) {
       const mid = intOrNull(req.body.site_logo);
@@ -360,6 +363,21 @@ export function registerRoutes(app) {
     } catch (err) {
       next(err);
     }
+  });
+  // List the media library so the editor can REUSE an existing asset instead of
+  // re-uploading it. Optional ?kind=image|video filter. Returns full rows (same
+  // shape as an upload), so the picker's result drops straight into any call site.
+  app.get('/api/media', requireEdit, (req, res) => {
+    const kind = req.query.kind;
+    let rows = listMedia();
+    if (kind === 'image' || kind === 'video') rows = rows.filter((r) => r.kind === kind);
+    res.json({ ok: true, media: rows });
+  });
+  // Poll a media row (the editor watches a video's transcode status).
+  app.get('/api/media/:id', requireEdit, (req, res) => {
+    const media = getMedia(intOrNull(req.params.id));
+    if (!media) return res.status(404).json({ error: 'Media not found' });
+    res.json({ ok: true, media });
   });
   app.patch('/api/media/:id', requireEdit, (req, res) => {
     const media = updateAlt(intOrNull(req.params.id), req.body.alt || '');

@@ -167,6 +167,39 @@ export function renderAbout(editMode) {
   return layout({ title: 'About', body, editMode, bodyClass: 'page-about' });
 }
 
+// --- Contact page -----------------------------------------------------------
+// A single editable rich-text block (same mechanism as the About mission), so the
+// contact details are managed in the browser like everything else.
+export function renderContact(editMode) {
+  const contact = Site.contact();
+  const body = `<div class="wrap">
+    <h1>Contact</h1>
+    <section class="contact-page">
+      <div class="richtext-wrap">
+        ${
+          editMode
+            ? `<div class="richtext" data-richtext data-target="contact">
+                 <div class="richtext__toolbar" aria-hidden="true">
+                   <button type="button" data-cmd="bold"><b>B</b></button>
+                   <button type="button" data-cmd="italic"><i>I</i></button>
+                   <button type="button" data-cmd="h2">H2</button>
+                   <button type="button" data-cmd="h3">H3</button>
+                   <button type="button" data-cmd="ul">• List</button>
+                   <button type="button" data-cmd="link">Link</button>
+                   <button type="button" data-cmd="save" class="richtext__save">Save</button>
+                 </div>
+                 <div class="richtext__area prose" contenteditable="true">${contact}</div>
+               </div>`
+            : contact
+              ? `<div class="prose">${contact}</div>`
+              : '<p class="muted">Contact details coming soon.</p>'
+        }
+      </div>
+    </section>
+  </div>`;
+  return layout({ title: 'Contact', body, editMode, bodyClass: 'page-contact' });
+}
+
 // --- Press Kit page ---------------------------------------------------------
 export function renderPressKit(editMode) {
   const games = Games.all();

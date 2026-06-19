@@ -19,29 +19,142 @@
 
   const reload = () => location.reload();
 
-  // Opens a file picker and uploads the chosen file(s). Returns media rows.
-  function uploadFiles({ accept, multiple } = {}) {
+  // --- upload with a progress bar (shared by edit.js + deck-edit.js) ---------
+  // A small glass overlay shows real upload progress (XHR), then "Processing…"
+  // for the server side. Exposed on window so the deck editor reuses it.
+  function uploadProgressUI() {
+    let el = document.getElementById('upload-progress');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'upload-progress';
+      el.className = 'upload-progress';
+      document.body.appendChild(el);
+    }
+    el.innerHTML =
+      '<div class="upload-progress__card">' +
+      '<div class="upload-progress__label">Uploading…</div>' +
+      '<div class="upload-progress__track"><div class="upload-progress__fill"></div></div>' +
+      '<div class="upload-progress__pct">0%</div></div>';
+    el.classList.remove('is-error');
+    el.classList.add('is-open');
+    const label = el.querySelector('.upload-progress__label');
+    const fill = el.querySelector('.upload-progress__fill');
+    const pct = el.querySelector('.upload-progress__pct');
+    const hide = (ms) => setTimeout(() => el.classList.remove('is-open', 'is-error'), ms);
+    return {
+      set(frac) {
+        const p = Math.max(0, Math.min(100, Math.round(frac * 100)));
+        fill.style.width = p + '%';
+        pct.textContent = p < 100 ? p + '%' : 'Processing…';
+        if (p >= 100) label.textContent = 'Transcoding for streaming…';
+      },
+      done() { fill.style.width = '100%'; pct.textContent = 'Processing…'; hide(700); },
+      fail(msg) { el.classList.add('is-error'); label.textContent = msg || 'Upload failed'; pct.textContent = '✕'; hide(5000); },
+    };
+  }
+
+  // Upload File[] to /api/media with progress. Resolves to media rows.
+  function uploadFilesWithProgress(files) {
+    return new Promise((resolve, reject) => {
+      const ui = uploadProgressUI();
+      const fd = new FormData();
+      for (const f of files) fd.append('files', f);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/media');
+      xhr.upload.addEventListener('progress', (e) => { if (e.lengthComputable) ui.set(e.loaded / e.total); });
+      xhr.addEventListener('load', () => {
+        let data = {};
+        try { data = JSON.parse(xhr.responseText); } catch (_) {}
+        if (xhr.status >= 200 && xhr.status < 300) { ui.done(); resolve(data.media || []); }
+        else { const m = data.error || `Upload failed (${xhr.status})`; ui.fail(m); reject(new Error(m)); }
+      });
+      xhr.addEventListener('error', () => { ui.fail('Network error during upload'); reject(new Error('Network error')); });
+      xhr.addEventListener('abort', () => { ui.fail('Upload cancelled'); reject(new Error('aborted')); });
+      ui.set(0);
+      xhr.send(fd);
+    });
+  }
+
+  // Direct OS file-dialog upload (the picker's “Upload new” button uses this).
+  function chooseAndUploadFiles({ accept, multiple } = {}) {
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = accept || 'image/*';
       input.multiple = !!multiple;
-      input.addEventListener('change', async () => {
+      input.addEventListener('change', () => {
         if (!input.files.length) return resolve([]);
-        const fd = new FormData();
-        for (const f of input.files) fd.append('files', f);
-        try {
-          const res = await fetch('/api/media', { method: 'POST', body: fd });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Upload failed');
-          resolve(data.media || []);
-        } catch (err) {
-          reject(err);
-        }
+        uploadFilesWithProgress(Array.from(input.files)).then(resolve, reject);
       });
       input.click();
     });
   }
+  const escAttr = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // Media picker: pick an EXISTING asset from the library (so the same upload can be
+  // reused anywhere with no re-upload) or upload a new one. Resolves to media rows
+  // (array — same shape as an upload), or [] if cancelled.
+  function openMediaPicker({ accept = 'image/*', multiple = false } = {}) {
+    const kind = /^video/.test(accept) ? 'video' : /^image/.test(accept) ? 'image' : '';
+    return new Promise((resolve, reject) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'media-picker';
+      overlay.innerHTML =
+        '<div class="media-picker__panel" role="dialog" aria-modal="true" aria-label="Choose media">' +
+          '<div class="media-picker__head">' +
+            `<strong>Choose ${kind || 'media'}</strong>` +
+            '<div class="media-picker__head-actions">' +
+              '<button type="button" class="btn" data-mp="upload">⬆ Upload new</button>' +
+              '<button type="button" class="ctl" data-mp="close" aria-label="Close">✕</button>' +
+            '</div></div>' +
+          '<div class="media-picker__grid" data-mp-grid><p class="muted">Loading library…</p></div>' +
+        '</div>';
+      document.body.appendChild(overlay);
+      let settled = false;
+      const done = (v) => { if (settled) return; settled = true; document.removeEventListener('keydown', onKey); overlay.remove(); resolve(v); };
+      const die = (e) => { if (settled) return; settled = true; document.removeEventListener('keydown', onKey); overlay.remove(); reject(e); };
+      const onKey = (e) => { if (e.key === 'Escape') done([]); };
+      document.addEventListener('keydown', onKey);
+      overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) done([]); });
+      overlay.querySelector('[data-mp="close"]').addEventListener('click', () => done([]));
+      overlay.querySelector('[data-mp="upload"]').addEventListener('click', () => {
+        chooseAndUploadFiles({ accept, multiple }).then((rows) => { if (rows && rows.length) done(rows); }, die);
+      });
+      const grid = overlay.querySelector('[data-mp-grid]');
+      fetch('/api/media' + (kind ? `?kind=${kind}` : ''), { headers: { 'X-Requested-With': 'picker' } })
+        .then((r) => r.json())
+        .then((data) => {
+          const items = (data && data.media) || [];
+          if (!items.length) { grid.innerHTML = '<p class="muted">Nothing in your library yet — use “Upload new”.</p>'; return; }
+          grid.innerHTML = items.map((m) => {
+            const preview = m.thumb ? `/media/thumbs/${m.thumb}` : (m.kind === 'image' ? `/media/${m.filename}` : '');
+            const name = m.original_name || ('#' + m.id);
+            const vid = m.kind === 'video';
+            const proc = m.status === 'processing';
+            const thumb = preview
+              ? `<img class="media-picker__thumb" loading="lazy" src="${escAttr(preview)}" alt="">`
+              : `<span class="media-picker__thumb media-picker__thumb--blank">${vid ? '🎞' : '🖼'}</span>`;
+            return `<button type="button" class="media-picker__item" data-id="${m.id}" title="${escAttr(name)}">` +
+              thumb + (vid ? '<span class="media-picker__badge">▶</span>' : '') +
+              (proc ? '<span class="media-picker__proc">processing…</span>' : '') +
+              `<span class="media-picker__name">${escAttr(name)}</span></button>`;
+          }).join('');
+          grid.querySelectorAll('.media-picker__item').forEach((b) => {
+            b.addEventListener('click', () => { const m = items.find((x) => String(x.id) === b.dataset.id); done(m ? [m] : []); });
+          });
+        })
+        .catch(() => { grid.innerHTML = '<p class="muted">Couldn’t load the library. Try “Upload new”.</p>'; });
+    });
+  }
+
+  // Choose media (existing or new). Returns media rows (array, possibly empty).
+  function pickAndUpload(opts = {}) { return openMediaPicker(opts); }
+  // Shared with deck-edit.js.
+  window.mediaUpload = pickAndUpload;
+
+  // Back-compat name used throughout this file.
+  const uploadFiles = pickAndUpload;
 
   function flash(msg, isError) {
     let el = document.getElementById('edit-flash');
@@ -82,6 +195,8 @@
           try {
             if (rt.dataset.target === 'mission') {
               await api('POST', '/api/settings', { mission: html });
+            } else if (rt.dataset.target === 'contact') {
+              await api('POST', '/api/settings', { contact: html });
             } else if (rt.dataset.taglineGame) {
               await api('PATCH', `/api/games/${rt.dataset.taglineGame}`, { tagline: html });
             } else if (rt.dataset.sectionId) {
@@ -312,19 +427,11 @@
           break;
         }
 
-        // ----- video -----
+        // ----- video (self-hosted upload; transcoded for streaming) -----
         case 'video-upload': {
           const [m] = await uploadFiles({ accept: 'video/*' });
-          if (m) { section.querySelector('[data-video-edit]').dataset.mediaId = m.id; flash('Video uploaded — click Save video'); }
-          break;
-        }
-        case 'video-save': {
-          const wrap = section.querySelector('[data-video-edit]');
-          const mode = wrap.querySelector(`input[name="vmode-${sectionId}"]:checked`)?.value || 'url';
-          const data = mode === 'file'
-            ? { mode: 'file', mediaId: parseInt(wrap.dataset.mediaId || '0', 10) || null }
-            : { mode: 'url', url: wrap.querySelector('[data-video-url]').value.trim() };
-          await api('PATCH', `/api/sections/${sectionId}`, { data });
+          if (!m) break;
+          await api('PATCH', `/api/sections/${sectionId}`, { data: { mediaId: m.id } });
           reload();
           break;
         }
@@ -522,13 +629,20 @@
     }, 300);
   });
 
-  // Video mode radio toggling.
-  document.addEventListener('change', (e) => {
-    const radio = e.target.closest('[data-video-edit] input[type="radio"]');
-    if (!radio) return;
-    const wrap = radio.closest('[data-video-edit]');
-    const isFile = radio.value === 'file';
-    wrap.querySelector('.video-edit__url').hidden = isFile;
-    wrap.querySelector('.video-edit__file').hidden = !isFile;
-  });
+  // Refresh a section once its video finishes transcoding.
+  (function pollVideoStatus() {
+    const el = document.querySelector('[data-video-edit][data-media-id]');
+    const id = el && el.dataset.mediaId;
+    if (!id) return;
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/media/${id}`, { headers: { 'X-Requested-With': 'poll' } });
+        const data = await res.json();
+        if (data.media && data.media.status !== 'processing') return location.reload();
+      } catch (_) {}
+      setTimeout(tick, 3000);
+    };
+    // Only poll while actually processing (the status span is present).
+    if (document.querySelector('[data-video-status]')) setTimeout(tick, 3000);
+  })();
 })();

@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import multer from 'multer';
 import { config } from './config.js';
 import { db, nowISO } from './db.js';
+import { ffmpegAvailable, enqueueTranscode } from './transcode.js';
 
 fs.mkdirSync(config.mediaDir, { recursive: true });
 const ORIGINALS_DIR = config.mediaDir;
@@ -69,8 +70,8 @@ export const upload = multer({
 });
 
 const _insertMedia = db.prepare(`
-  INSERT INTO media (filename, original_name, mime, kind, size, width, height, thumb, alt, created_at)
-  VALUES (@filename, @original_name, @mime, @kind, @size, @width, @height, @thumb, @alt, @created_at)
+  INSERT INTO media (filename, original_name, mime, kind, size, width, height, thumb, alt, status, playback, created_at)
+  VALUES (@filename, @original_name, @mime, @kind, @size, @width, @height, @thumb, @alt, @status, @playback, @created_at)
 `);
 const _getMedia = db.prepare('SELECT * FROM media WHERE id = ?');
 const _deleteMedia = db.prepare('DELETE FROM media WHERE id = ?');
@@ -111,6 +112,19 @@ export async function registerUpload(file, alt = '') {
     }
   }
 
+  // Videos are normalised to a streamable MP4 by the transcoder. When ffmpeg is
+  // present the upload starts as 'processing' and a background job fills in the
+  // playback file; otherwise it's served as-is so the site keeps working.
+  let status = 'ready';
+  let playback = null;
+  if (kind === 'video') {
+    if (await ffmpegAvailable()) {
+      status = 'processing';
+    } else {
+      playback = file.filename;
+    }
+  }
+
   const row = {
     filename: file.filename,
     original_name: file.originalname || file.filename,
@@ -121,9 +135,12 @@ export async function registerUpload(file, alt = '') {
     height,
     thumb,
     alt: String(alt || ''),
+    status,
+    playback,
     created_at: nowISO(),
   };
   const info = _insertMedia.run(row);
+  if (kind === 'video' && status === 'processing') enqueueTranscode(info.lastInsertRowid);
   return getMedia(info.lastInsertRowid);
 }
 
@@ -132,6 +149,7 @@ export function deleteMedia(id) {
   if (!row) return false;
   for (const p of [
     path.join(ORIGINALS_DIR, row.filename),
+    row.playback && row.playback !== row.filename ? path.join(ORIGINALS_DIR, row.playback) : null,
     row.thumb ? path.join(THUMBS_DIR, row.thumb) : null,
   ]) {
     if (p && fs.existsSync(p)) {
@@ -154,6 +172,16 @@ export function updateAlt(id, alt) {
 // Resolve a media row to public URLs used in markup.
 export function mediaUrl(row) {
   return row ? `/media/${row.filename}` : '';
+}
+// Streamable URL for a video (the transcoded MP4 once ready; falls back to the
+// original). Empty while a video is still processing.
+export function playbackUrl(row) {
+  if (!row) return '';
+  if (row.kind === 'video') return row.playback ? `/media/${row.playback}` : '';
+  return `/media/${row.filename}`;
+}
+export function videoReady(row) {
+  return Boolean(row && row.kind === 'video' && row.status === 'ready' && row.playback);
 }
 export function thumbUrl(row) {
   if (!row) return '';

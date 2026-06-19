@@ -69,6 +69,13 @@ export const config = {
   mediaDir: resolvePath(process.env.MEDIA_DIR, './media'),
   maxUploadMb: parseInt(process.env.MAX_UPLOAD_MB || '300', 10),
 
+  // Video transcoding (ffmpeg). Uploaded videos are normalised to a web-streamable
+  // faststart H.264/AAC MP4. Override the binaries' paths if not on PATH.
+  ffmpegPath: process.env.FFMPEG_PATH || 'ffmpeg',
+  ffprobePath: process.env.FFPROBE_PATH || 'ffprobe',
+  videoMaxHeight: parseInt(process.env.VIDEO_MAX_HEIGHT || '1080', 10),
+  videoCrf: parseInt(process.env.VIDEO_CRF || '23', 10),
+
   email: {
     provider: (process.env.EMAIL_PROVIDER || '').toLowerCase(),
     apiKey: process.env.EMAIL_API_KEY || '',

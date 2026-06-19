@@ -1,9 +1,9 @@
 // Pitch-deck rendering: a public full-screen viewer and an edit-mode
 // Google-Slides-style editor. Images on slides are displayed at full
 // resolution (originals) — never downressed.
-import { layout, renderSlideBlock, toEmbedUrl, triSvg } from './render.js';
+import { layout, renderSlideBlock, triSvg } from './render.js';
 import { escapeHtml } from './sanitize.js';
-import { getMedia, mediaUrl, thumbUrl } from './media.js';
+import { getMedia, mediaUrl, thumbUrl, playbackUrl, videoReady } from './media.js';
 
 // --- public viewer ----------------------------------------------------------
 export function renderDeckViewer(game, slides) {
@@ -164,31 +164,37 @@ function renderBlockEditor(block, i) {
       break;
     }
     case 'video': {
-      const isFile = block.mode === 'file';
-      const m = isFile ? getMedia(block.mediaId) : null;
+      const m = block.mediaId ? getMedia(block.mediaId) : null;
       const thumb = block.thumbId ? getMedia(block.thumbId) : null;
-      inner = `<div class="block-video" data-media-id="${block.mediaId || ''}" data-thumb-id="${block.thumbId || ''}">
-        <div class="seg">
-          <label><input type="radio" name="bvmode-${i}" value="url" ${
-        !isFile ? 'checked' : ''
-      } data-block-vmode> URL</label>
-          <label><input type="radio" name="bvmode-${i}" value="file" ${
-        isFile ? 'checked' : ''
-      } data-block-vmode> File</label>
-        </div>
-        <input type="url" data-block-vurl value="${escapeHtml(
-          block.url || ''
-        )}" placeholder="YouTube/Vimeo URL" ${isFile ? 'hidden' : ''}>
-        <div class="block-video__file" ${isFile ? '' : 'hidden'}>
-          <button type="button" class="ctl" data-action="block-video-upload">Upload video</button>
-          <span class="muted">${m ? escapeHtml(m.original_name) : 'no file'}</span>
-        </div>
+      const overlay = block.overlayId ? getMedia(block.overlayId) : null;
+      let stateHtml = '<span class="muted">No video uploaded.</span>';
+      if (m && m.kind === 'video') {
+        if (videoReady(m)) {
+          stateHtml = `<video class="block-video__preview" src="${escapeHtml(
+            playbackUrl(m)
+          )}" controls preload="metadata" playsinline></video>`;
+        } else if (m.status === 'failed') {
+          stateHtml = '<span class="muted">Processing failed — try another file.</span>';
+        } else {
+          stateHtml = `<span class="muted" data-video-status data-media-id="${m.id}">Processing… (transcoding for streaming)</span>`;
+        }
+      }
+      inner = `<div class="block-video" data-media-id="${block.mediaId || ''}" data-thumb-id="${block.thumbId || ''}" data-overlay-id="${block.overlayId || ''}">
+        <div class="block-video__state">${stateHtml}</div>
+        <button type="button" class="ctl" data-action="block-video-upload">${m ? 'Replace' : 'Upload'} video</button>
         <div class="block-video__thumb">
           <div class="block-video__thumbpreview">${
-            thumb ? `<img src="${escapeHtml(mediaUrl(thumb))}" alt="">` : '<span class="muted">No thumbnail</span>'
+            thumb ? `<img src="${escapeHtml(mediaUrl(thumb))}" alt="">` : '<span class="muted">Auto poster from video</span>'
           }</div>
           <button type="button" class="ctl" data-action="block-video-thumb">${thumb ? 'Change' : 'Add'} thumbnail</button>
           ${thumb ? '<button type="button" class="ctl ctl--danger" data-action="block-video-thumb-remove">Remove</button>' : ''}
+        </div>
+        <div class="block-video__thumb block-video__overlay-edit">
+          <div class="block-video__thumbpreview">${
+            overlay ? `<img src="${escapeHtml(mediaUrl(overlay))}" alt="">` : '<span class="muted">No overlay — slides out on play</span>'
+          }</div>
+          <button type="button" class="ctl" data-action="block-video-overlay">${overlay ? 'Change' : 'Add'} overlay image</button>
+          ${overlay ? '<button type="button" class="ctl ctl--danger" data-action="block-video-overlay-remove">Remove</button>' : ''}
         </div>
       </div>`;
       break;

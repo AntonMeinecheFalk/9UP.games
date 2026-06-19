@@ -32,6 +32,73 @@
       const val = br.endsWith('%') ? (parseFloat(br) / 100) * Math.min(r.width, r.height) : (parseFloat(br) || 0);
       return Math.min(val, r.width / 2, r.height / 2);
     };
+    // Play-arrow shockwave: a rounded-triangle ring (a corner circle at each of the
+    // triangle's points, joined by their tangent lines) that expands equidistantly
+    // and fades — the shaped analogue of the box ring. Growing the offset `r` keeps
+    // every point the same distance out, so it rounds toward a circle as it travels.
+    // Vertices match the play clip (#vt-clip-play).
+    const TRI_VERTS = [[0.34, 0.214], [0.80, 0.50], [0.34, 0.786]];
+    const unit = (x, y) => { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; };
+    const triPath = (centers, r) => {
+      const n = centers.length, nm = [];
+      for (let i = 0; i < n; i++) {
+        const a = centers[i], b = centers[(i + 1) % n], d = unit(b[0] - a[0], b[1] - a[1]);
+        nm.push([d[1], -d[0]]); // outward edge normal (clockwise winding, y-down)
+      }
+      let s = '';
+      for (let i = 0; i < n; i++) {
+        const C = centers[i], nIn = nm[(i + n - 1) % n], nOut = nm[i];
+        const ax = C[0] + r * nIn[0], ay = C[1] + r * nIn[1];
+        const bx = C[0] + r * nOut[0], by = C[1] + r * nOut[1];
+        s += `${i ? 'L' : 'M'} ${ax.toFixed(1)} ${ay.toFixed(1)} A ${r.toFixed(1)} ${r.toFixed(1)} 0 0 1 ${bx.toFixed(1)} ${by.toFixed(1)} `;
+      }
+      return s + 'Z';
+    };
+    const triShockwave = (rect) => {
+      const NS = 'http://www.w3.org/2000/svg';
+      const centers = TRI_VERTS.map(([x, y]) => [rect.left + x * rect.width, rect.top + y * rect.height]);
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('class', 'shockwave-tri');
+      svg.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none';
+      const path = document.createElementNS(NS, 'path');
+      svg.appendChild(path);
+      fxLayer().appendChild(svg);
+      const r0 = rect.width * 0.07, travel = rect.height * 0.7, DUR = 550;
+      let start = null;
+      const tick = (now) => {
+        if (start == null) start = now;
+        let t = (now - start) / DUR; if (t > 1) t = 1;
+        const e = 1 - Math.pow(1 - t, 3); // ease-out, like the box ring
+        path.setAttribute('d', triPath(centers, r0 + e * travel));
+        path.setAttribute('stroke-width', (5 - 4 * e).toFixed(2)); // 5px → 1px, thins as it travels
+        svg.style.opacity = t < 0.8 ? '1' : String(1 - (t - 0.8) / 0.2); // late fade
+        if (t < 1) requestAnimationFrame(tick); else svg.remove();
+      };
+      requestAnimationFrame(tick);
+    };
+    // Box ring: starts as the button's outline (size + corner radius R) and expands
+    // by a CONSTANT offset on every side (box +2d, radius +d) so it stays equidistant
+    // — a pill stays two half-circles joined by parallel lines, not a bigger pill.
+    const boxShockwave = (r, R) => {
+      const d = r.height * 0.7; // how far the ring travels outward
+      const wave = document.createElement('span');
+      wave.className = 'shockwave';
+      wave.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:${R}px`;
+      fxLayer().appendChild(wave);
+      const anim = wave.animate(
+        // Stays fully opaque while the line thins (5px → 1px); only at the very end —
+        // once it's 1px and can't visibly get thinner — does it fade out.
+        [
+          { offset: 0, left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
+            borderRadius: `${R}px`, borderWidth: '5px', opacity: 1 },
+          { offset: 0.8, borderWidth: '1px', opacity: 1 },
+          { offset: 1, left: `${r.left - d}px`, top: `${r.top - d}px`, width: `${r.width + 2 * d}px`, height: `${r.height + 2 * d}px`,
+            borderRadius: `${R + d}px`, borderWidth: '1px', opacity: 0 },
+        ],
+        { duration: 550, easing: 'cubic-bezier(0.2, 0.6, 0.35, 1)' }
+      );
+      anim.finished.then(() => wave.remove(), () => wave.remove());
+    };
     document.addEventListener('pointerdown', (e) => {
       if (e.button != null && e.button !== 0) return; // primary button only
       const btn = e.target.closest(SELECTOR);
@@ -46,34 +113,18 @@
         ],
         { duration: 460, easing: 'ease-out' }
       );
-      // Shockwave: a ring that starts as the button's exact outline and expands
-      // by a CONSTANT offset on every side (box +2d, radius +d) so it stays
-      // equidistant from the button — a pill stays two half-circles joined by
-      // parallel lines instead of ballooning at the ends like a uniform scale
-      // would. Lives in the body-level .fx-layer so a soft-nav swap can't cut it.
+      // Shockwave: lives in the body-level .fx-layer so a soft-nav swap can't cut it.
       const r = btn.getBoundingClientRect();
       if (!r.width) return;
-      const R = effectiveRadius(btn, r); // the button's real corner radius (px)
-      const d = r.height * 0.7; // how far the ring travels outward
-      const wave = document.createElement('span');
-      wave.className = 'shockwave';
-      wave.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:${R}px`;
-      fxLayer().appendChild(wave);
-      const anim = wave.animate(
-        // Stays fully opaque while the line thins (5px → 1px); only at the very
-        // end — once it's 1px and can't visibly get thinner — does it fade out.
-        // Geometry is on the 0/1 keyframes so it eases across the whole travel;
-        // border-width + opacity get an extra keyframe at 0.8 for the late fade.
-        [
-          { offset: 0, left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
-            borderRadius: `${R}px`, borderWidth: '5px', opacity: 1 },
-          { offset: 0.8, borderWidth: '1px', opacity: 1 },
-          { offset: 1, left: `${r.left - d}px`, top: `${r.top - d}px`, width: `${r.width + 2 * d}px`, height: `${r.height + 2 * d}px`,
-            borderRadius: `${R + d}px`, borderWidth: '1px', opacity: 0 },
-        ],
-        { duration: 550, easing: 'cubic-bezier(0.2, 0.6, 0.35, 1)' }
-      );
-      anim.finished.then(() => wave.remove(), () => wave.remove());
+      // The video toggle is shaped, so it gets shape-matched rings: a rounded-triangle
+      // for the play arrow, and a rounded square for the pause bars (the toggle itself
+      // has no border-radius, so the default ring would be a hard square).
+      if (btn.classList.contains('video-toggle')) {
+        if (btn.classList.contains('is-playing')) boxShockwave(r, r.width * 0.22);
+        else triShockwave(r);
+        return;
+      }
+      boxShockwave(r, effectiveRadius(btn, r)); // every other button: its own outline
     });
   })();
 
@@ -176,6 +227,245 @@
     update();
   })();
 
+  // --- Custom video player --------------------------------------------------
+  // Our own play/pause UI for every video on the site (pitch-deck slides + page
+  // sections). The <iframe>/<video> is built lazily on first play and driven via
+  // the platform JS API so ZERO native YouTube/Vimeo chrome ever shows — the only
+  // control is the glass toggle. On a slide the toggle is lifted to a slide-level
+  // element so it's the top layer regardless of where the video block sits, and
+  // its play/pause acts on every video in that slide (there is only ever one).
+  const videoPlayers = (function () {
+    const controllers = new Map(); // frame element -> controller
+    const groups = []; // { host, frames, btn, observer, onActive }
+
+    // -- one controller per <video-frame>: a self-hosted <video> element -------
+    function makeController(frame) {
+      const mount = frame.querySelector('[data-video-media]');
+      let media = null;
+      let wantPlay = false; // user intent → drives the toggle icon
+      const listeners = [];
+      const notify = () => listeners.forEach((fn) => fn());
+      const timeListeners = [];          // playhead updates (kept separate from `notify`
+      const notifyTime = () => timeListeners.forEach((fn) => fn()); // so they don't re-arm hide)
+
+      // Build the <video> lazily (or via prefetch). No native controls — our glass
+      // toggle drives it. The poster lifts on first playback (is-started) and the
+      // real (paused) frame is fine to show afterwards (a self-hosted file has no
+      // third-party chrome to hide).
+      function build() {
+        if (media) return media;
+        const v = document.createElement('video');
+        v.src = frame.dataset.file;
+        v.setAttribute('playsinline', '');
+        v.playsInline = true;
+        v.preload = 'auto';
+        v.addEventListener('playing', () => { frame.classList.add('is-started'); });
+        v.addEventListener('play', () => { wantPlay = true; notify(); });
+        v.addEventListener('pause', () => { wantPlay = false; notify(); });
+        v.addEventListener('ended', () => { wantPlay = false; notify(); });
+        v.addEventListener('timeupdate', notifyTime);
+        v.addEventListener('loadedmetadata', notifyTime);
+        v.addEventListener('seeking', notifyTime);
+        mount.appendChild(v);
+        media = v;
+        return v;
+      }
+      function prefetch() { build(); }
+      function play() {
+        const v = build();
+        wantPlay = true; notify();
+        const p = v.play();
+        if (p && p.catch) p.catch(() => {});
+      }
+      function pause() { if (media) media.pause(); }
+      function destroy() {
+        try { if (media) { media.pause(); media.removeAttribute('src'); media.load(); media.remove(); } } catch (_) {}
+        media = null;
+      }
+      return {
+        frame, play, pause, prefetch, destroy,
+        isPlaying: () => wantPlay,
+        onChange: (fn) => listeners.push(fn),
+        onTime: (fn) => timeListeners.push(fn),
+        duration: () => (media && isFinite(media.duration) ? media.duration : 0),
+        currentTime: () => (media ? media.currentTime : 0),
+        seek: (t) => { const v = build(); if (isFinite(v.duration) && v.duration) v.currentTime = Math.max(0, Math.min(t, v.duration)); },
+      };
+    }
+
+    function controllerFor(frame) {
+      let c = controllers.get(frame);
+      if (!c) { c = makeController(frame); controllers.set(frame, c); }
+      return c;
+    }
+
+    // -- a control group: one glass toggle driving every video under `host` ---
+    function initGroup(host, frames, isSlide) {
+      const ctrls = frames.map(controllerFor);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'video-toggle' + (isSlide ? ' video-toggle--slide' : '');
+      btn.setAttribute('aria-label', 'Play video');
+      // The play triangle / pause bars are frosted-glass child shapes (see styles.css).
+      btn.innerHTML =
+        '<span class="video-toggle__play"></span>' +
+        '<span class="video-toggle__pause"><i></i><i></i></span>';
+      // Scrubber: a black track pinned to the frame bottom with a glass playhead.
+      // Starts hidden — it only fades in after the first play (so it never sits over
+      // the pre-roll overlay image), then follows the same rules as the toggle.
+      const scrub = document.createElement('div');
+      scrub.className = 'video-scrub is-hidden';
+      scrub.innerHTML =
+        '<div class="video-scrub__track"><span class="video-scrub__line"></span>' +
+        '<button type="button" class="video-scrub__head" aria-label="Seek"></button></div>';
+      const track = scrub.querySelector('.video-scrub__track');
+      const head = scrub.querySelector('.video-scrub__head');
+      const primary = ctrls[0];
+      const layout = () => {
+        const d = primary.duration();
+        head.style.left = (d ? Math.max(0, Math.min(1, primary.currentTime() / d)) * 100 : 0) + '%';
+      };
+      ctrls.forEach((c) => c.onTime(layout));
+
+      // Auto-hide while playing: both controls fade out ~1s after the last pointer
+      // movement over the video, or the instant the pointer leaves the frame. Any
+      // movement back over the video brings them right back; paused → always shown.
+      // Hovering a control (or dragging the playhead) keeps them up — a motionless
+      // pointer parked on the button isn't "movement over the frame", so without this
+      // the idle timer would hide the very button you're reaching for.
+      let hideTimer = null, dragging = false, overControls = false, scrubReady = false, scrubArmed = false;
+      const playing = () => ctrls.some((c) => c.isPlaying());
+      // The toggle shows from the start; the scrubber stays hidden until scrubReady
+      // (set shortly after the first play) so it never overlaps the overlay image.
+      const setHidden = (v) => {
+        btn.classList.toggle('is-hidden', v);
+        scrub.classList.toggle('is-hidden', v || !scrubReady);
+      };
+      const clearHide = () => { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } };
+      const armHide = () => { clearHide(); if (playing()) hideTimer = setTimeout(() => { if (!dragging && !overControls) setHidden(true); }, 1000); };
+      // Pin the controls open while the pointer is over the toggle or the scrubber.
+      [btn, track].forEach((el) => {
+        el.addEventListener('pointerenter', () => { overControls = true; clearHide(); setHidden(false); });
+        el.addEventListener('pointerleave', () => { overControls = false; armHide(); });
+      });
+      const refresh = () => {
+        const on = playing();
+        btn.classList.toggle('is-playing', on);
+        btn.setAttribute('aria-label', on ? 'Pause video' : 'Play video');
+        if (on && !scrubArmed) {
+          // First play: reveal the timeline only AFTER the overlay image has slid out
+          // (~0.6s) so it never overlaps it; from then on it follows the normal rules.
+          scrubArmed = true;
+          setTimeout(() => { if (scrub.isConnected) { scrubReady = true; setHidden(false); armHide(); } }, 600);
+        }
+        if (on) armHide();                  // start the idle countdown
+        else { clearHide(); setHidden(false); } // paused: always visible
+      };
+      ctrls.forEach((c) => c.onChange(refresh));
+      const prefetch = () => ctrls.forEach((c) => c.prefetch());
+      const toggle = () => {
+        if (ctrls.some((c) => c.isPlaying())) ctrls.forEach((c) => c.pause());
+        else ctrls.forEach((c) => c.play());
+      };
+      btn.addEventListener('click', toggle);
+      // Build as early as possible (pointerdown precedes click) so playback can
+      // start inside the gesture — never stranded on YouTube's cued centre button.
+      btn.addEventListener('pointerdown', prefetch);
+
+      // Drag/click the track to seek (all videos in the group move together).
+      const seekToX = (clientX) => {
+        const r = track.getBoundingClientRect();
+        if (!r.width) return;
+        const pct = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+        const d = primary.duration();
+        if (d) { ctrls.forEach((c) => c.seek(pct * d)); }
+        head.style.left = pct * 100 + '%';
+      };
+      track.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        try { track.setPointerCapture(e.pointerId); } catch (_) {}
+        seekToX(e.clientX); e.preventDefault();
+      });
+      track.addEventListener('pointermove', (e) => { if (dragging) seekToX(e.clientX); });
+      const endDrag = (e) => { dragging = false; try { track.releasePointerCapture(e.pointerId); } catch (_) {} armHide(); };
+      track.addEventListener('pointerup', endDrag);
+      track.addEventListener('pointercancel', endDrag);
+
+      // Clicking anywhere on the video (its cover) also toggles play/pause.
+      frames.forEach((f) => {
+        const cover = f.querySelector('[data-video-cover]');
+        if (cover) {
+          cover.addEventListener('click', toggle);
+          cover.addEventListener('pointerdown', prefetch);
+          cover.addEventListener('pointerenter', prefetch);
+        }
+        // Reveal on movement over the video and (re)arm the idle hide; hide on exit.
+        f.addEventListener('pointermove', () => { setHidden(false); armHide(); });
+        f.addEventListener('pointerleave', () => { clearHide(); if (playing() && !dragging) setHidden(true); });
+      });
+      host.appendChild(btn);
+      host.appendChild(scrub);
+
+      const group = { host, frames, btn, observer: null, ctrls, clearHide };
+      if (isSlide) {
+        // Prefetch when the slide becomes active (so it's ready before the click);
+        // pause when it stops being the active one.
+        const sync = () => {
+          if (host.classList.contains('is-active')) prefetch();
+          else ctrls.forEach((c) => c.pause());
+        };
+        const obs = new MutationObserver(sync);
+        obs.observe(host, { attributes: true, attributeFilter: ['class'] });
+        group.observer = obs;
+        if (host.classList.contains('is-active')) prefetch();
+      } else {
+        host.addEventListener('pointerenter', prefetch);
+      }
+      groups.push(group);
+    }
+
+    // -- scan a root for new video groups; prune any detached ones ------------
+    function scan(root) {
+      // Prune controllers/groups whose elements are gone (e.g. after a soft-nav).
+      controllers.forEach((c, frame) => {
+        if (!frame.isConnected) { c.destroy(); controllers.delete(frame); }
+      });
+      for (let i = groups.length - 1; i >= 0; i--) {
+        if (!groups[i].host.isConnected) {
+          if (groups[i].observer) groups[i].observer.disconnect();
+          if (groups[i].clearHide) groups[i].clearHide();
+          groups.splice(i, 1);
+        }
+      }
+      const scope = root || document;
+      // Pitch-deck slides: group by slide so the toggle controls the whole slide.
+      scope.querySelectorAll('.deck-slide').forEach((slide) => {
+        if (slide.querySelector('.video-toggle')) return; // already wired
+        const frames = Array.from(slide.querySelectorAll('[data-video]'));
+        if (frames.length) initGroup(slide, frames, true);
+      });
+      // Standalone videos (page sections): one toggle inside each frame.
+      scope.querySelectorAll('[data-video]').forEach((frame) => {
+        if (frame.closest('.deck-slide')) return; // handled above
+        if (controllers.has(frame) && frame.querySelector('.video-toggle')) return;
+        initGroup(frame, [frame], false);
+      });
+    }
+
+    // Pre-build players inside `root` (used when the deck popup opens) so the
+    // first click plays immediately, never stranding on a cued-state centre button.
+    function prefetchInside(root) {
+      controllers.forEach((c) => { if (root.contains(c.frame)) c.prefetch(); });
+    }
+
+    // Pause every video inside `root` (used when the deck popup closes).
+    function pauseInside(root) {
+      controllers.forEach((c) => { if (root.contains(c.frame)) c.pause(); });
+    }
+
+    return { scan, prefetchInside, pauseInside };
+  })();
+
   // --- Pitch-deck popup -----------------------------------------------------
   // Open the deck in-page (over the hero) instead of navigating. Delegated, so
   // it keeps working for the popup markup swapped in by soft-nav. Sequence:
@@ -276,6 +566,7 @@
       pop.hidden = false;
       void pop.offsetWidth;
       pop.classList.add('is-open');                             // fade the backdrop in (CSS)
+      videoPlayers.prefetchInside(pop);                         // pre-build videos so play is instant
 
       // Decode every slide image up front so paging through them never hitches.
       // Race a 5s safety cap so a slow/stuck decode can never trap the loader.
@@ -309,7 +600,10 @@
       };
 
       if (reduceMotion) {
-        card.style.transform = 'scale(1)';
+        // `none`, not `scale(1)`: a transformed ancestor flattens descendant
+        // backdrop-filter, which would kill the glass video toggle's frost. `none`
+        // is visually identical at rest but lets the blur work again.
+        card.style.transform = 'none';
         preloaded.finally(reveal);
       } else {
         controls.forEach((a) => { a.style.opacity = '0'; });    // hidden until their turn
@@ -322,7 +616,9 @@
           ],
           { duration: 540, delay: 200, easing: 'cubic-bezier(0.25, 0.6, 0.3, 1)', fill: 'both' }
         );
-        const grown = grow.finished.then(() => { card.style.transform = 'scale(1)'; grow.cancel(); }).catch(() => {});
+        // Settle on `none` (not `scale(1)`) so the card stops being a transformed
+        // ancestor — otherwise it flattens the toggle's backdrop-filter (no frost).
+        const grown = grow.finished.then(() => { card.style.transform = 'none'; grow.cancel(); }).catch(() => {});
         // The X pops as soon as the card lands — it doesn't wait for the preload.
         grown.then(() => { if (isOpen && closeBtn) slideIn(closeBtn); });
         // The arrows wait until the card is up AND every slide is decoded; then the
@@ -341,6 +637,7 @@
       if (!isOpen || !pop) return;
       isOpen = false;
       const _pop = pop, _hero = hero, _opener = opener;
+      videoPlayers.pauseInside(_pop); // stop any playing slide video
       const card = _pop.querySelector('[data-deck-card]');
       const controls = Array.from(_pop.querySelectorAll('.deck-pop__prev, .deck-pop__next, .deck-pop__close'));
       if (_hero) _hero.classList.remove('is-deck-open');
@@ -366,7 +663,10 @@
         );
         shrink.onfinish = () => { shrink.cancel(); finish(); };
       }
-      if (_opener && _opener.focus) _opener.focus({ preventScroll: true });
+      // Clear focus on close so no trigger/control is left in a :focus-visible
+      // (hover-looking) state — e.g. the opener button floating after an Escape
+      // close. We intentionally don't return focus to the opener for that reason.
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       pop = null; hero = null; opener = null;
     }
 
@@ -408,6 +708,9 @@
     initGamesCarousel();
     initHeroParallax();
     initPressFlow();
+    videoPlayers.scan(document);
+    // Stop any playing video before the next soft-nav swaps <main> out.
+    teardowns.push(() => videoPlayers.pauseInside(document));
   }
 
   // --- Image carousels ------------------------------------------------------
@@ -617,7 +920,7 @@
     const cls = document.body.classList;
     if (cls.contains('is-edit') || cls.contains('page-deck') || cls.contains('page-deck-edit')) return;
 
-    const SHELL = new Set(['/', '/games', '/about', '/press']);
+    const SHELL = new Set(['/', '/contact', '/games', '/about', '/press']);
     let token = 0; // guards against out-of-order responses when clicking fast
     history.scrollRestoration = 'manual';
 

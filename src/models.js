@@ -126,7 +126,7 @@ function defaultSectionData(type) {
     case 'carousel':
       return { images: [] }; // [{ mediaId, alt }]
     case 'video':
-      return { mode: 'url', url: '', mediaId: null };
+      return { mediaId: null }; // self-hosted upload
     case 'buttons':
       return { buttons: [] }; // [{ label, url }]
     default:
@@ -360,6 +360,8 @@ export const Site = {
   setTitle: (v) => setSetting('site_title', v),
   mission: () => getSetting('about_mission', ''),
   setMission: (v) => setSetting('about_mission', v),
+  contact: () => getSetting('contact_html', ''),
+  setContact: (v) => setSetting('contact_html', v),
   featuredGameId: () => {
     const v = getSetting('featured_game_id', '');
     return v ? parseInt(v, 10) : null;

@@ -5,6 +5,7 @@ import { config, ROOT, editConfigured } from './config.js';
 import { editModeMiddleware } from './auth.js';
 import { registerRoutes } from './routes.js';
 import { shutdownDb } from './db.js';
+import { resumePending } from './transcode.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -85,6 +86,7 @@ const server = app.listen(config.port, config.host, () => {
   } else {
     console.log('  Edit mode: enabled — unlock at /edit/<EDIT_SECRET>');
   }
+  resumePending(); // resume any video transcode interrupted by a restart
 });
 
 // Graceful shutdown: stop accepting connections, checkpoint + close the DB so

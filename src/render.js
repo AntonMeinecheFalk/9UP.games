@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { escapeHtml, safeUrl } from './sanitize.js';
-import { getMedia, mediaUrl, thumbUrl } from './media.js';
+import { getMedia, mediaUrl, thumbUrl, playbackUrl, videoReady } from './media.js';
 import { ROOT } from './config.js';
 import {
   Site,
@@ -109,10 +109,11 @@ export function layout({ title, body, editMode, extraHead = '', bodyClass = '' }
   // (the dropdown lives OUTSIDE the header so its backdrop-filter can blur the
   // page; a backdrop-filter nested inside the blurred header is isolated).
   // Highlight the nav link for the page we're on (kept in sync on soft-nav by app.js).
-  const activeHref = { 'page-home': '/', 'page-games': '/games', 'page-about': '/about', 'page-press': '/press' }[bodyClass] || '';
+  const activeHref = { 'page-home': '/', 'page-games': '/games', 'page-about': '/about', 'page-press': '/press', 'page-contact': '/contact' }[bodyClass] || '';
   const navLink = (href, label) =>
     `<a href="${href}"${href === activeHref ? ' aria-current="page"' : ''}>${label}</a>`;
   const navLinks =
+    navLink('/contact', 'Contact') +
     navLink('/', 'Home') +
     navLink('/games', 'Games') +
     navLink('/about', 'About') +
@@ -143,6 +144,12 @@ ${themeStyle(theme)}
 ${extraHead}
 </head>
 <body class="${bodyClass}${editMode ? ' is-edit' : ''}">
+<!-- Rounded play-triangle clip for the glass video toggle. It lives on the .video-toggle__play
+     span; the frosted ::before is clipped to this shape by the parent (a backdrop-filter on a
+     clip-path: url() element itself renders no blur — only the parent-crops-child route does). -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
+  <clipPath id="vt-clip-play" clipPathUnits="objectBoundingBox"><path d="M.34 .292 Q.34 .214 .39 .253 L.75 .461 Q.80 .50 .75 .539 L.39 .747 Q.34 .786 .34 .708 Z"/></clipPath>
+</defs></svg>
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="wrap">
@@ -547,42 +554,40 @@ function renderCarousel(section, editMode) {
 
 function renderVideo(section, editMode) {
   const d = section.data || {};
-  let player = '<p class="muted">No video set.</p>';
-  if (d.mode === 'url' && d.url) {
-    const embed = toEmbedUrl(d.url);
-    if (embed) {
-      player = `<div class="video-frame"><iframe src="${escapeHtml(
-        embed
-      )}" title="Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
-    } else {
-      player = `<p class="muted">Unsupported video URL.</p>`;
+  const m = d.mediaId ? getMedia(d.mediaId) : null;
+  const { poster } = videoPoster(null, m);
+
+  if (!editMode) {
+    if (m && m.kind === 'video' && videoReady(m)) {
+      return renderVideoFrame({ src: playbackUrl(m), poster, posterAlt: m.alt || '' });
     }
-  } else if (d.mode === 'file' && d.mediaId) {
-    const m = getMedia(d.mediaId);
-    if (m) {
-      player = `<div class="video-frame"><video controls preload="metadata" playsinline>
-        <source src="${escapeHtml(mediaUrl(m))}" type="${escapeHtml(m.mime)}">
-      </video></div>`;
+    if (m && m.kind === 'video') {
+      return poster
+        ? `<div class="video-frame"><img class="video-frame__poster" src="${escapeHtml(poster)}" alt=""></div>`
+        : '<p class="muted">Video processing…</p>';
+    }
+    return '<p class="muted">No video set.</p>';
+  }
+
+  // Edit mode: upload a file + a scrubbable native-controls preview once ready.
+  let preview = '<p class="muted">No video uploaded.</p>';
+  if (m && m.kind === 'video') {
+    if (videoReady(m)) {
+      preview = `<div class="video-frame"><video controls preload="metadata" playsinline src="${escapeHtml(
+        playbackUrl(m)
+      )}"></video></div>`;
+    } else if (m.status === 'failed') {
+      preview = '<p class="muted">Processing failed — try a different file.</p>';
+    } else {
+      preview = '<p class="muted" data-video-status>Processing… (this can take a while)</p>';
     }
   }
-  if (!editMode) return player;
-  return `${player}
-  <div class="video-edit" data-video-edit data-section-id="${section.id}">
-    <div class="seg">
-      <label><input type="radio" name="vmode-${section.id}" value="url" ${
-    d.mode !== 'file' ? 'checked' : ''
-  }> Embed URL</label>
-      <label><input type="radio" name="vmode-${section.id}" value="file" ${
-    d.mode === 'file' ? 'checked' : ''
-  }> Uploaded file</label>
-    </div>
-    <div class="video-edit__url" ${d.mode === 'file' ? 'hidden' : ''}>
-      <input type="url" data-video-url value="${escapeHtml(d.url || '')}" placeholder="YouTube or Vimeo URL">
-    </div>
-    <div class="video-edit__file" ${d.mode === 'file' ? '' : 'hidden'}>
-      <button type="button" class="ctl" data-action="video-upload" data-section-id="${section.id}">Upload video file</button>
-    </div>
-    <button type="button" class="ctl" data-action="video-save" data-section-id="${section.id}">Save video</button>
+  return `${preview}
+  <div class="video-edit" data-video-edit data-section-id="${section.id}" data-media-id="${m ? m.id : ''}">
+    <button type="button" class="ctl" data-action="video-upload" data-section-id="${section.id}">${
+    m ? 'Replace' : 'Upload'
+  } video</button>
+    <span class="muted">${m ? escapeHtml(m.original_name || '') : 'Self-hosted MP4/MOV/WebM — transcoded for streaming.'}</span>
   </div>`;
 }
 
@@ -677,29 +682,38 @@ export function renderTeamCard(member, editMode) {
   </article>`;
 }
 
-// --- video URL → embed URL --------------------------------------------------
-export function toEmbedUrl(url) {
-  try {
-    const u = new URL(url);
-    const host = u.hostname.replace(/^www\./, '');
-    if (host === 'youtube.com' || host === 'm.youtube.com') {
-      const id = u.searchParams.get('v');
-      if (id) return `https://www.youtube.com/embed/${encodeURIComponent(id)}`;
-    }
-    if (host === 'youtu.be') {
-      const id = u.pathname.slice(1);
-      if (id) return `https://www.youtube.com/embed/${encodeURIComponent(id)}`;
-    }
-    if (host === 'youtube.com' && u.pathname.startsWith('/embed/')) return u.href;
-    if (host === 'vimeo.com') {
-      const id = u.pathname.split('/').filter(Boolean)[0];
-      if (id && /^\d+$/.test(id)) return `https://player.vimeo.com/video/${id}`;
-    }
-    if (host === 'player.vimeo.com') return u.href;
-  } catch {
-    /* ignore */
-  }
-  return '';
+// --- custom video player frame ----------------------------------------------
+// Shared markup for both pitch-deck slides and page sections. Videos are
+// self-hosted (uploaded + transcoded to a streamable MP4) — no third-party
+// embeds. The <video> is created lazily by the client (app.js → videoPlayers);
+// here we emit only the source, a poster, and a click-catching cover. The glass
+// play/pause toggle is added (and, on slides, lifted to the top layer) by the client.
+export function renderVideoFrame({ src = '', mime = 'video/mp4', poster = '', posterAlt = '', overlay = '', overlayAlt = '', fill = false } = {}) {
+  const posterHtml = poster
+    ? `<img class="video-frame__poster" src="${escapeHtml(poster)}" alt="${escapeHtml(posterAlt)}">`
+    : '<div class="video-frame__poster video-frame__poster--blank" aria-hidden="true"></div>';
+  // Optional decorative overlay: sits over the video and slides out the bottom
+  // (clipped by the frame's rounded box) once playback starts.
+  const overlayHtml = overlay
+    ? `<img class="video-frame__overlay" src="${escapeHtml(overlay)}" alt="${escapeHtml(overlayAlt)}" aria-hidden="true">`
+    : '';
+  return `<div class="video-frame${fill ? ' video-frame--fill' : ''}" data-video data-provider="file" data-file="${escapeHtml(
+    src
+  )}" data-mime="${escapeHtml(mime)}">
+    <div class="video-frame__media" data-video-media></div>
+    ${posterHtml}
+    ${overlayHtml}
+    <div class="video-frame__cover" data-video-cover></div>
+  </div>`;
+}
+
+// Poster image for a video block: a manually-set thumbnail wins, else the frame
+// auto-extracted during transcode. Returns { poster, alt }.
+function videoPoster(block, media) {
+  const manual = block && block.thumbId ? getMedia(block.thumbId) : null;
+  if (manual) return { poster: mediaUrl(manual), alt: manual.alt || '' };
+  if (media && media.thumb) return { poster: thumbUrl(media), alt: media.alt || '' };
+  return { poster: '', alt: '' };
 }
 
 // --- slide block rendering (public viewer) ----------------------------------
@@ -730,33 +744,26 @@ export function renderSlideBlock(block) {
         .join('')}</div>`;
     }
     case 'video': {
-      // Resolve the player source (embed URL or uploaded file).
-      let embed = '';
-      let fileUrl = '';
-      let mime = '';
-      if (block.mode === 'url' && block.url) {
-        embed = toEmbedUrl(block.url);
-      } else if (block.mode === 'file' && block.mediaId) {
-        const m = getMedia(block.mediaId);
-        if (m) {
-          fileUrl = mediaUrl(m);
-          mime = m.mime;
-        }
+      const m = block.mediaId ? getMedia(block.mediaId) : null;
+      if (!m || m.kind !== 'video') return '';
+      const { poster, alt } = videoPoster(block, m);
+      // Still transcoding (or failed with no playback): show the poster, no player.
+      if (!videoReady(m)) {
+        return poster
+          ? `<div class="slide-block slide-block--video"><div class="video-frame video-frame--fill"><img class="video-frame__poster" src="${escapeHtml(
+              poster
+            )}" alt="${escapeHtml(alt)}"></div></div>`
+          : '';
       }
-      if (!embed && !fileUrl) return '';
-
-      // The slide-deck video player is being rebuilt with custom UI. For now we
-      // render NO player UI at all — no <iframe>, no <video controls>, no play
-      // button — so neither our old controls nor any YouTube/Vimeo chrome can
-      // ever show. The source rides on data-attributes for the upcoming custom
-      // player; a thumbnail (if set) shows as a static, non-interactive poster.
-      const thumb = block.thumbId ? getMedia(block.thumbId) : null;
-      const poster = thumb
-        ? `<img src="${escapeHtml(mediaUrl(thumb))}" alt="${escapeHtml(thumb.alt || '')}">`
-        : '';
-      return `<div class="slide-block slide-block--video"><div class="video-frame" data-video data-embed="${escapeHtml(
-        embed
-      )}" data-file="${escapeHtml(fileUrl)}" data-mime="${escapeHtml(mime)}">${poster}</div></div>`;
+      const ov = block.overlayId ? getMedia(block.overlayId) : null;
+      return `<div class="slide-block slide-block--video">${renderVideoFrame({
+        src: playbackUrl(m),
+        poster,
+        posterAlt: alt,
+        overlay: ov ? mediaUrl(ov) : '',
+        overlayAlt: ov ? ov.alt || '' : '',
+        fill: true,
+      })}</div>`;
     }
     default:
       return '';

@@ -21,11 +21,18 @@
     return data;
   }
 
-  function uploadFile(accept) {
+  // Open a picker + upload with a progress bar. Uses the shared helper from
+  // edit.js (loaded on every edit page, incl. this one); falls back to a plain
+  // fetch if it isn't available for any reason.
+  async function uploadFile(accept) {
+    if (typeof window.mediaUpload === 'function') {
+      const media = await window.mediaUpload({ accept, multiple: false });
+      return media[0] || null;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
     return new Promise((resolve, reject) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = accept;
       input.addEventListener('change', async () => {
         if (!input.files.length) return resolve(null);
         const fd = new FormData();
@@ -65,13 +72,11 @@
         blocks.push({ type: 'buttons', buttons });
       } else if (type === 'video') {
         const box = el.querySelector('.block-video');
-        const mode = el.querySelector('[data-block-vmode]:checked')?.value || 'url';
         blocks.push({
           type: 'video',
-          mode,
-          url: el.querySelector('[data-block-vurl]').value,
           mediaId: parseInt(box.dataset.mediaId || '0', 10) || null,
           thumbId: parseInt(box.dataset.thumbId || '0', 10) || null,
+          overlayId: parseInt(box.dataset.overlayId || '0', 10) || null,
         });
       }
     });
@@ -106,15 +111,21 @@
     });
   });
 
-  // --- video radio toggling -------------------------------------------------
-  editor.addEventListener('change', (e) => {
-    const radio = e.target.closest('[data-block-vmode]');
-    if (!radio) return;
-    const body = radio.closest('.block-video');
-    const isFile = radio.value === 'file';
-    body.querySelector('[data-block-vurl]').hidden = isFile;
-    body.querySelector('.block-video__file').hidden = !isFile;
-  });
+  // --- poll a still-transcoding video and refresh when it's ready -----------
+  function pollVideoStatus() {
+    const el = editor.querySelector('[data-video-status][data-media-id]');
+    if (!el) return;
+    const id = el.dataset.mediaId;
+    setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/media/${id}`, { headers: { 'X-Requested-With': 'poll' } });
+        const data = await res.json();
+        if (data.media && data.media.status !== 'processing') return location.reload();
+      } catch (_) {}
+      pollVideoStatus();
+    }, 3000);
+  }
+  pollVideoStatus();
 
   // --- click delegation -----------------------------------------------------
   editor.addEventListener('click', async (e) => {
@@ -172,7 +183,13 @@
           } else if (type === 'buttons') {
             blocks.push({ type: 'buttons', buttons: [{ label: 'Button', url: '' }] });
           } else if (type === 'video') {
-            blocks.push({ type: 'video', mode: 'url', url: '', mediaId: null });
+            // Only one video per slide (the custom player's play/pause acts on
+            // the whole slide, so a second video would have no separate control).
+            if (blocks.some((b) => b.type === 'video')) {
+              alert('A slide can only contain one video.');
+              return;
+            }
+            blocks.push({ type: 'video', mediaId: null, thumbId: null });
           }
           await api('PUT', `/api/slides/${currentSlideId()}`, { blocks });
           location.reload();
@@ -209,6 +226,9 @@
           const m = await uploadFile('video/*');
           if (!m) return;
           blockEl.querySelector('.block-video').dataset.mediaId = m.id;
+          // Persist the slide and reload so the transcode/processing state shows.
+          await saveCurrent();
+          location.reload();
           break;
         }
         case 'block-video-thumb': {
@@ -223,6 +243,20 @@
           const box = blockEl.querySelector('.block-video');
           box.dataset.thumbId = '';
           box.querySelector('.block-video__thumbpreview').innerHTML = '<span class="muted">No thumbnail</span>';
+          break;
+        }
+        case 'block-video-overlay': {
+          const m = await uploadFile('image/*');
+          if (!m) return;
+          const box = blockEl.querySelector('.block-video');
+          box.dataset.overlayId = m.id;
+          box.querySelector('.block-video__overlay-edit .block-video__thumbpreview').innerHTML = `<img src="/media/${m.filename}" alt="">`;
+          break;
+        }
+        case 'block-video-overlay-remove': {
+          const box = blockEl.querySelector('.block-video');
+          box.dataset.overlayId = '';
+          box.querySelector('.block-video__overlay-edit .block-video__thumbpreview').innerHTML = '<span class="muted">No overlay</span>';
           break;
         }
         case 'block-btn-add': {

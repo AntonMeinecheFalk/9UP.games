@@ -106,6 +106,9 @@ function ensureColumn(table, column, definition) {
 ensureColumn('games', 'logo_media', 'INTEGER REFERENCES media(id) ON DELETE SET NULL');
 ensureColumn('games', 'display', "TEXT NOT NULL DEFAULT '{}'");
 ensureColumn('games', 'tagline', "TEXT NOT NULL DEFAULT ''");
+// Video processing: status of the transcode job and the streamable MP4 filename.
+ensureColumn('media', 'status', "TEXT NOT NULL DEFAULT 'ready'"); // 'ready' | 'processing' | 'failed'
+ensureColumn('media', 'playback', 'TEXT'); // web-streamable mp4 filename (videos)
 
 // --- settings helpers -------------------------------------------------------
 const _getSetting = db.prepare('SELECT value FROM settings WHERE key = ?');
