@@ -232,19 +232,16 @@
       target.classList.add('is-entering'); // display flex, on top, opacity 0
       void target.offsetWidth;             // commit opacity 0 before transitioning
       target.classList.add('is-shown');    // fade opacity -> 1
-      let fallback;
-      const finish = () => {
-        clearTimeout(fallback);
-        target.removeEventListener('transitionend', onEnd);
+      const done = (e) => {
+        if (e.target !== target || e.propertyName !== 'opacity') return;
+        target.removeEventListener('transitionend', done);
         prevEl.classList.remove('is-active');
         target.classList.remove('is-entering', 'is-shown');
         target.classList.add('is-active');
         idx = t;
         wiping = false;
       };
-      const onEnd = (e) => { if (e.target === target && e.propertyName === 'opacity') finish(); };
-      target.addEventListener('transitionend', onEnd);
-      fallback = setTimeout(finish, 350); // safety if transitionend doesn't fire
+      target.addEventListener('transitionend', done);
     };
 
     function open(btn) {
@@ -383,10 +380,8 @@
     });
     document.addEventListener('keydown', (e) => {
       if (!isOpen) return;
-      if (e.key === 'Escape') { close(); return; }
-      // Stop arrow/space/page keys scrolling the page behind the popup.
-      if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', ' ', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) e.preventDefault();
-      if (e.key === 'ArrowRight') showSlide(1);
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowRight') showSlide(1);
       else if (e.key === 'ArrowLeft') showSlide(-1);
     });
     let sx = null;
