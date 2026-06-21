@@ -329,6 +329,18 @@ export function registerRoutes(app) {
     }
     if ('site_title' in req.body) Site.setTitle(String(req.body.site_title || '').slice(0, 200));
     if ('mission' in req.body) Site.setMission(sanitizeRichHtml(req.body.mission || ''));
+    if ('home_tagline' in req.body) Site.setHomeTagline(sanitizeRichHtml(req.body.home_tagline || ''));
+    if ('home_socials' in req.body) {
+      const arr = Array.isArray(req.body.home_socials) ? req.body.home_socials : [];
+      const clean = arr
+        .slice(0, 24)
+        .map((s) => ({
+          mediaId: intOrNull(s && s.mediaId),
+          url: s && typeof s.url === 'string' ? s.url.slice(0, 500) : '',
+        }))
+        .filter((s) => s.mediaId && getMedia(s.mediaId)); // a social must have a valid icon
+      Site.setHomeSocials(clean);
+    }
     if ('contact' in req.body) Site.setContact(sanitizeRichHtml(req.body.contact || ''));
     if ('parallax' in req.body) Site.setParallax(req.body.parallax);
     if ('site_logo' in req.body) {

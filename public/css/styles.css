@@ -351,7 +351,9 @@ body.page-admin #main, body.page-deck-edit #main {
 /* All buttons use the same filled gradient style — no hollow/outline variants.
    --secondary and --ghost inherit the base look entirely. --linkedin keeps its
    brand colour but still gets the rim highlight, shadow and motion. */
-.btn--linkedin { background: var(--linkedin); color: #fff; }
+/* --linkedin shares the standard accent gradient (inherited from .btn) so it
+   matches every other button — only the icon marks it as LinkedIn. */
+.btn--linkedin { color: #fff; }
 .button-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 
 /* --- click feedback: a ring shockwave that matches the button's shape --------
@@ -1424,4 +1426,229 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); mar
 @media (max-width: 640px) {
   .theme-panel { width: calc(100vw - 2.5rem); }
   .site-footer .wrap { flex-direction: column; gap: 0.5rem; }
+}
+
+/* ============================================================================
+   Homepage — glass-logo landing
+   The company logo (white silhouette) is used as a MASK: a giant glass plate
+   reveals a game's key art in glassy reflection strips, framed by a white top
+   inner-shadow rim and a subtle blue bottom rim. Five outline echoes sit behind
+   and lag the plate's hover-tilt (driven by app.js → initLogoStage) to form an
+   outward wave. Pre-baked rim/outline masks are in /img (see build-logo-glass.js).
+   ========================================================================= */
+.home-hero {
+  position: relative;
+  min-height: 100svh;
+  /* Top-anchored (not vertically centred) so the logo sits high and the tagline
+     can be pulled up into the logo's empty lower area with a direct margin. */
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: calc(var(--header-h) + env(safe-area-inset-top) - 3.5vh) 1rem 3rem;
+  /* The echoes repeat outward to the screen edges; clip them there (and stop any
+     horizontal scroll) without affecting the fixed bg/paw layers behind. */
+  overflow: hidden;
+}
+.home-hero__inner {
+  display: flex; flex-direction: column; align-items: center; gap: 1.8rem; width: 100%;
+}
+
+.logo-stage {
+  position: relative; z-index: 0;
+  width: min(735px, 90vw, 82vmin); aspect-ratio: 1 / 1;
+  /* Contain ALL the inner mix-blend-mode layers to the stage so they can never
+     composite against the whole page (which caused a cyan full-screen flash when
+     the window lost/regained focus). */
+  isolation: isolate;
+}
+.logo-stage--empty { display: flex; align-items: center; justify-content: center; text-align: center; }
+
+/* Frosted-glass base: the whole logo reads as real glass — a blurred view of the
+   page background (gradient + drifting paws + echoes) behind it, like the site's
+   other glass panels. The silhouette mask and the backdrop-filter MUST be on the
+   SAME element: a mask on a *parent* makes it a backdrop root, leaving the child's
+   backdrop-filter nothing behind it to blur (verified). It sits OUTSIDE the tilting
+   plate (a transformed ancestor would flatten the backdrop-filter), which is also
+   physically right: the transmitted background doesn't swing with the view angle.
+   Only a whisper of haze on top — most of the look is the real blurred backdrop,
+   so the static shape stays invisible against the background when the plate tilts. */
+/* The logo plate wraps the frost + glass; its filter casts the two drop shadows
+   (Photoshop values). filter: drop-shadow is a clean gaussian that follows the
+   rendered shape and re-computes every frame, so the shadows tilt naturally with
+   the plate — no baked PNG, no knockout artifacts, no ghosting. A parent filter
+   does NOT disable a child's backdrop-filter (verified), so the frost blur still
+   works. #18 (cyan) is listed first so it renders on top of #19 (blue). */
+.logo-plate {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  filter:
+    /* second downward shadow — half the size of the big one, offset down so it
+       reads along downward-facing edges; listed first so it renders on top. Uses
+       the bottom background colour (bg2). */
+    drop-shadow(0px 18px 36px #2363b3)
+    drop-shadow(-2.2px -17.9px 27px rgba(62, 203, 255, 0.52))
+    drop-shadow(0.6px 35px 73px rgba(62, 203, 255, 0.52));
+}
+
+.lg-frost {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  transform-origin: 50% 50%; will-change: transform; /* tilts with the plate (app.js) */
+  /* Painted background = the page colours (bg → bg2) at partial opacity. This is
+     BOTH the blue glass tint AND the surface the child .lg-art screens over (a
+     child's blend can't read the backdrop-filter, only a painted layer). The
+     live blur shows through this partial opacity, and fully wherever the art is
+     masked out. */
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--bg) 42%, transparent),
+    color-mix(in srgb, var(--bg2) 48%, transparent));
+  -webkit-backdrop-filter: var(--blur-lg) saturate(1.1);
+          backdrop-filter: var(--blur-lg) saturate(1.1);
+  -webkit-mask: var(--logo-mask) center / contain no-repeat;
+          mask: var(--logo-mask) center / contain no-repeat;
+}
+
+/* The tilting glass plate — now holds only the rims (the art is a separate
+   sibling below so it can screen-blend against the frost). Isolated so the rims'
+   screen blend stays clean white instead of mixing through the hollow cut-outs. */
+.logo-glass {
+  position: absolute; inset: 0; z-index: 4; isolation: isolate;
+  pointer-events: none; transform-origin: 50% 50%; will-change: transform;
+}
+/* Outline echoes: same-size copies of the silhouette repeated in a single
+   horizontal row out to both screen edges (built by app.js). Each is positioned
+   on a wrapper (translateX step) and tilts IN PLACE on its own centre, replaying
+   the glass plate's hover-tilt from further in the past the further out it sits —
+   so the motion ripples outward as a wave. Hidden without JS / reduced-motion. */
+.logo-echoes { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.logo-echo-pos { position: absolute; inset: 0; pointer-events: none; }
+.logo-echo {
+  position: absolute; inset: 0; pointer-events: none;
+  transform-origin: 50% 50%; /* NO will-change — ~30 promoted layers caused flicker */
+  background: #3ecbff; /* bright cyan — the drop-shadow colour */
+  -webkit-mask: var(--outline) center / contain no-repeat;
+          mask: var(--outline) center / contain no-repeat;
+}
+
+.lg-layer { position: absolute; inset: 0; pointer-events: none; }
+
+/* Key art revealed through the logo — sits directly over the frosted glass, and
+   clipped to the silhouette AND faded out toward the edges (the radial mask) so
+   the wings / halo / ear-tips show the frosted background rather than the art's
+   bright sky. background-position nudges on hover (--px/--py) for parallax depth. */
+.lg-art {
+  position: absolute; inset: 0; pointer-events: none;
+  mix-blend-mode: screen; /* the key art only LIGHTENS the blue glass it sits on */
+  background-image: var(--hero-url);
+  background-size: 128%;
+  background-position: calc(50% + var(--px, 0px)) calc(40% + var(--py, 0px));
+  filter: saturate(0.96) brightness(1.05);
+  opacity: 0.95; /* masked out (→ blurred background) wherever the reflection mask is black */
+  /* Clipped to THREE intersected masks: the silhouette; a radial fade (wings/
+     halo → frost); and the hand-authored reflection texture (white = art shows,
+     black = frosted glass shows) — the sheen reads in the glass/background colour,
+     NOT white. The texture is over-sized (110%) so the hover-slide (--sx/--sy,
+     kept small to match) never reaches its edges, sliding so reflections sweep. */
+  /* Clipped to the silhouette and TWO copies of the reflection texture, MULTIPLIED
+     (intersected): the original (110%) and a larger copy (137.5% = 1.25×) that
+     parallaxes a bit further on hover (--sx2/--sy2 > --sx/--sy) so the two slide
+     at different rates and interfere. No radial fade — ONLY the texture mask
+     controls where the art fades out. */
+  -webkit-mask-image:
+    var(--logo-mask),
+    var(--reflect-mask),
+    var(--reflect-mask);
+  mask-image:
+    var(--logo-mask),
+    var(--reflect-mask),
+    var(--reflect-mask);
+  -webkit-mask-size: contain, 110% 110%, 137.5% 137.5%;
+          mask-size: contain, 110% 110%, 137.5% 137.5%;
+  -webkit-mask-position: center,
+    calc(50% + var(--sx, 0px)) calc(50% + var(--sy, 0px)),
+    calc(50% + var(--sx2, 0px)) calc(50% + var(--sy2, 0px));
+          mask-position: center,
+    calc(50% + var(--sx, 0px)) calc(50% + var(--sy, 0px)),
+    calc(50% + var(--sx2, 0px)) calc(50% + var(--sy2, 0px));
+  -webkit-mask-repeat: no-repeat, no-repeat, no-repeat;
+          mask-repeat: no-repeat, no-repeat, no-repeat;
+  -webkit-mask-composite: source-in; /* intersect all (multiply alphas) */
+          mask-composite: intersect;
+}
+/* Two colour gradients inside the glass (children of .lg-frost, so clipped to the
+   silhouette + tilt with the plate). mix-blend-mode: screen so they genuinely
+   lighten the glass content behind them: a deep royal blue rising from the bottom
+   to the middle, and a cyan falling from the top to the middle. */
+.lg-grad { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; }
+.lg-grad--bottom { background: linear-gradient(to top, #1d4ed8 0%, transparent 50%); }
+.lg-grad--top { background: linear-gradient(to bottom, #3ecbff 0%, transparent 50%); }
+
+/* Pre-baked rims — their own alpha carries the glow; a solid colour fills it. */
+.lg-rim { mix-blend-mode: screen; }
+.lg-rim--top {
+  z-index: 4; background: #ffffff; opacity: 1;
+  -webkit-mask: var(--rim-top) center / contain no-repeat;
+          mask: var(--rim-top) center / contain no-repeat;
+}
+.lg-rim--bottom {
+  /* On TOP of the whole plate, and (being a direct plate child, not inside the
+     isolated glass) its screen blend mixes with everything behind it. Tilts via JS. */
+  z-index: 5; background: #1377ff; opacity: 0.4;
+  transform-origin: 50% 50%; will-change: transform;
+  -webkit-mask: var(--rim-bottom) center / contain no-repeat;
+          mask: var(--rim-bottom) center / contain no-repeat;
+}
+
+.home-tagline {
+  /* Pull up by exactly the logo's empty bottom (9.2% of the stage, measured from
+     the silhouette) so the logo→text gap equals the text→socials flex gap. Stage-
+     relative (not vh) so it stays balanced on every window size. */
+  margin: 0; margin-top: calc(min(735px, 90vw, 82vmin) * -0.092);
+  position: relative; z-index: 1; /* above the logo stage's drop shadow */
+  max-width: 100%; text-align: center; color: #fff;
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: clamp(1.05rem, 2.3vw, 1.5rem); line-height: 1.5;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+/* Base is 600 so bolded words actually read heavier (the heading font tops out at
+   700, so a 700 base would leave bold with nowhere to go). */
+.home-tagline strong, .home-tagline b { font-weight: 800; }
+/* The tagline can be rich text (editable like the mission field) — keep it full
+   width (so one-line still works) and strip prose's block margins so it stays tight. */
+.home-tagline.prose { max-width: 100%; }
+.home-tagline p, .home-tagline h2, .home-tagline h3,
+.home-tagline ul, .home-tagline ol { margin: 0; }
+.home-tagline ul, .home-tagline ol { display: inline-block; text-align: left; padding-left: 1.2rem; }
+/* In edit mode the rich-text editor sits just below the logo (not pulled up over it). */
+.home-tagline--edit { margin-top: 1rem; text-shadow: none; }
+.home-social { display: flex; gap: 1rem; position: relative; z-index: 1; }
+.social-btn {
+  width: 56px; height: 56px; padding: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.social-btn svg { width: 27px; height: 27px; display: block; }
+.social-btn__icon { width: 58%; height: 58%; object-fit: contain; display: block; pointer-events: none; }
+/* Edit-mode socials manager: each button shown with its URL + icon/remove controls. */
+.home-social--edit { flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 1rem; }
+.social-edit {
+  display: flex; flex-direction: column; align-items: center; gap: 0.45rem;
+  padding: 0.65rem; border-radius: 16px; background: rgba(0, 0, 0, 0.28);
+  -webkit-backdrop-filter: var(--blur-sm); backdrop-filter: var(--blur-sm);
+}
+.social-btn--preview { cursor: default; }
+.social-btn__ph { color: #fff; font-weight: 800; font-size: 1.4rem; }
+.social-edit__url {
+  width: 150px; max-width: 42vw; padding: 0.35rem 0.5rem;
+  border-radius: 8px; border: 1px solid var(--border);
+}
+.social-edit__row { display: flex; gap: 0.35rem; }
+.social-add {
+  align-self: center; padding: 0.6rem 1rem; border-radius: 14px; cursor: pointer;
+  color: #fff; font-family: var(--font-heading); font-weight: 700;
+  background: rgba(0, 0, 0, 0.28); border: 1px dashed var(--btn-highlight);
+}
+.home-edit { justify-content: center; margin-top: 1.5rem; }
+
+@media (max-width: 820px) {
+  .logo-stage { width: min(440px, 88vw); }
+  .home-tagline { max-width: 34ch; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-glass, .logo-echo, .lg-layer { will-change: auto; }
 }

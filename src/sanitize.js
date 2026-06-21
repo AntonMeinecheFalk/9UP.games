@@ -5,11 +5,24 @@ import sanitizeHtml from 'sanitize-html';
 
 const RICH_OPTS = {
   allowedTags: [
-    'p', 'br', 'h2', 'h3', 'strong', 'b', 'em', 'i', 'u',
+    'p', 'br', 'h2', 'h3', 'strong', 'b', 'em', 'i', 'u', 'span',
     'ul', 'ol', 'li', 'a', 'blockquote',
   ],
   allowedAttributes: {
     a: ['href', 'target', 'rel'],
+    '*': ['style'], // style is kept only where allowedStyles matches (font-size below)
+  },
+  // Only font-size survives (keyword sizes from execCommand, or explicit units);
+  // every other declaration is dropped, so this can't smuggle anything dangerous.
+  allowedStyles: {
+    '*': {
+      'font-size': [
+        /^(-webkit-)?(xxx-large|xx-large|x-large|large|medium|small|x-small|xx-small)$/,
+        /^\d{1,4}(\.\d+)?(px|pt|rem|em|%)$/,
+      ],
+      'font-weight': [/^(normal|bold|bolder|lighter|[1-9]00)$/],
+      'font-style': [/^(normal|italic|oblique)$/],
+    },
   },
   allowedSchemes: ['http', 'https', 'mailto'],
   // Force safe link behavior and prevent reverse-tabnabbing.

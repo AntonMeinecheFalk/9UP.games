@@ -105,6 +105,7 @@
         if (cmd === 'bold') document.execCommand('bold');
         else if (cmd === 'italic') document.execCommand('italic');
         else if (cmd === 'h2') document.execCommand('formatBlock', false, 'h2');
+        else if (cmd === 'p') document.execCommand('formatBlock', false, 'p');
         else if (cmd === 'ul') document.execCommand('insertUnorderedList');
         else if (cmd === 'link') { const u = prompt('Link URL'); if (u) document.execCommand('createLink', false, u); }
       });

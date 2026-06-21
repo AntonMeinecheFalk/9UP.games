@@ -124,6 +124,7 @@ function renderBlockEditor(block, i) {
           <button type="button" data-cmd="bold"><b>B</b></button>
           <button type="button" data-cmd="italic"><i>I</i></button>
           <button type="button" data-cmd="h2">H2</button>
+          <button type="button" data-cmd="p" title="Normal text">¶</button>
           <button type="button" data-cmd="ul">• List</button>
           <button type="button" data-cmd="link">Link</button>
         </div>

@@ -2,6 +2,7 @@
 import {
   layout,
   renderHero,
+  renderHomeLanding,
   renderSection,
   renderTeamCard,
   renderGamesCarousel,
@@ -11,76 +12,11 @@ import { escapeHtml } from './sanitize.js';
 import { Games, Sections, Team, Site, Slides } from './models.js';
 
 // --- Landing page -----------------------------------------------------------
+// The homepage is a brand-first "glass logo" landing (see renderHomeLanding):
+// the company logo as a giant glass shape revealing a game's key art, a tagline,
+// and social links. Per-game content lives on each game's own page.
 export function renderHome(editMode) {
-  const games = Games.all();
-  const featuredId = Site.featuredGameId();
-  const featured = (featuredId && Games.get(featuredId)) || games[0] || null;
-
-  // Featured-game controls (edit mode). Defined here, placed AFTER the hero so
-  // the hero stays the first element and can extend up behind the top bar.
-  const featuredToolbar = editMode
-    ? `<div class="wrap toolbar">
-      <label class="ctl-inline">Featured game:
-        <select data-action="set-featured">
-          <option value="">— none —</option>
-          ${games
-            .map(
-              (g) =>
-                `<option value="${g.id}" ${
-                  featured && g.id === featured.id ? 'selected' : ''
-                }>${escapeHtml(g.title)}</option>`
-            )
-            .join('')}
-        </select>
-      </label>
-      <button type="button" class="ctl" data-action="create-game">+ New game</button>
-    </div>`
-    : '';
-
-  let body = '';
-
-  if (!featured) {
-    body += featuredToolbar;
-    body += `<div class="wrap empty-state">
-      <h1>${escapeHtml(Site.title())}</h1>
-      <p class="muted">No featured game yet.${
-        editMode ? ' Create a game and select it as featured above.' : ''
-      }</p>
-    </div>`;
-    return layout({ title: null, body, editMode, bodyClass: 'page-home' });
-  }
-
-  body += renderHero(featured, editMode, Slides.forGame(featured.id));
-  body += featuredToolbar;
-  body += `<div class="wrap sections" data-sections-owner="game" data-owner-id="${featured.id}">`;
-  for (const section of Sections.list('game', featured.id)) {
-    body += renderSection(section, editMode);
-  }
-  if (editMode) {
-    body += addSectionMenu('game', featured.id);
-    body += `<div class="game-edit-extra">
-      <a class="ctl" href="/game/${escapeHtml(featured.slug)}/deck">Edit this game's pitch deck →</a>
-      <button type="button" class="ctl ctl--danger" data-action="delete-game" data-game-id="${featured.id}">Delete this game</button>
-    </div>`;
-  }
-  body += `</div>`;
-
-  // Optionally list other games.
-  const others = games.filter((g) => !featured || g.id !== featured.id);
-  if (others.length) {
-    body += `<div class="wrap other-games">
-      <h2>More games</h2>
-      <ul class="game-list">
-        ${others
-          .map(
-            (g) =>
-              `<li><a href="/game/${escapeHtml(g.slug)}">${escapeHtml(g.title)}</a></li>`
-          )
-          .join('')}
-      </ul>
-    </div>`;
-  }
-
+  const body = renderHomeLanding(editMode);
   return layout({ title: null, body, editMode, bodyClass: 'page-home' });
 }
 
@@ -134,6 +70,7 @@ export function renderAbout(editMode) {
                    <button type="button" data-cmd="italic"><i>I</i></button>
                    <button type="button" data-cmd="h2">H2</button>
                    <button type="button" data-cmd="h3">H3</button>
+                   <button type="button" data-cmd="p" title="Normal text">¶</button>
                    <button type="button" data-cmd="ul">• List</button>
                    <button type="button" data-cmd="link">Link</button>
                    <button type="button" data-cmd="save" class="richtext__save">Save</button>
@@ -187,6 +124,7 @@ export function renderContact(editMode) {
                    <button type="button" data-cmd="italic"><i>I</i></button>
                    <button type="button" data-cmd="h2">H2</button>
                    <button type="button" data-cmd="h3">H3</button>
+                   <button type="button" data-cmd="p" title="Normal text">¶</button>
                    <button type="button" data-cmd="ul">• List</button>
                    <button type="button" data-cmd="link">Link</button>
                    <button type="button" data-cmd="save" class="richtext__save">Save</button>

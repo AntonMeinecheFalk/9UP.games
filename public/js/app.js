@@ -876,6 +876,7 @@
     initCarousels();
     initGamesCarousel();
     initHeroParallax();
+    initLogoStage();
     initPressFlow();
     videoPlayers.scan(document);
     // Stop any playing video before the next soft-nav swaps <main> out.
@@ -984,6 +985,124 @@
     teardowns.push(() => {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
+      if (raf != null) cancelAnimationFrame(raf);
+    });
+  }
+
+  // --- Homepage glass-logo stage --------------------------------------------
+  // Hover tilts the glass plate in perspective; its reflection strips slide
+  // across (background-position) so the sheen tracks the angle. Behind it, a
+  // single horizontal row of SAME-SIZE outline echoes repeats out to both screen
+  // edges; each echo replays the plate's tilt from further in the past the
+  // further out it sits (a ~0.1s-per-step lag held in a ring buffer), so the
+  // motion ripples outward as a wave. The echo count is derived from the
+  // viewport so the row always reaches the edges (rebuilt on resize).
+  function initLogoStage() {
+    const stage = document.querySelector('[data-logo-stage]');
+    if (!stage) return;
+    const glass = stage.querySelector('[data-logo-glass]');
+    if (!glass) return;
+    if (reduceMotion) return; // static glass logo — no tilt/echo
+    const echoLayer = stage.querySelector('[data-logo-echoes]');
+    const art = stage.querySelector('[data-logo-art]');
+    const frost = stage.querySelector('.lg-frost');
+    const botRim = stage.querySelector('[data-logo-botrim]');
+
+    const MAXDEG = 13;        // peak tilt in each axis
+    const STEP_FRAC = 0.13;   // horizontal echo spacing as a fraction of the logo size
+    const DELAY = 9;          // frames per echo step (~0.15s) → outward wave speed
+    const MAX_PER_SIDE = 26;  // safety cap (tight spacing → more copies)
+
+    let echoes = [];          // [{ el, dist }]
+    let HIST = 64, hist = [], head = 0;
+    let tx = 0, ty = 0, gx = 0, gy = 0; // smoothed (t*) toward target (g*), −1..1
+
+    // Build the row of echoes: same size as the glass plate, stepped out on a
+    // translateX wrapper both directions, fading toward the edges. The ring
+    // buffer is sized to cover the outermost echo's delay.
+    function buildEchoes() {
+      if (!echoLayer) return;
+      echoLayer.textContent = '';
+      echoes = [];
+      const rect = stage.getBoundingClientRect();
+      const step = rect.width * STEP_FRAC;
+      if (!step) return;
+      const reach = window.innerWidth / 2 + rect.width / 2;
+      const nPer = Math.min(MAX_PER_SIDE, Math.ceil(reach / step) + 3); // +2 past the edge
+      for (const side of [-1, 1]) {
+        for (let i = 1; i <= nPer; i++) {
+          const op = 0.45 * Math.pow(0.6, i - 1); // ×0.6 each step outward
+          if (op < 0.02) break; // stop at invisible echoes (don't animate dead layers)
+          const pos = document.createElement('div');
+          pos.className = 'logo-echo-pos';
+          pos.style.transform = `translateX(${(side * i * step).toFixed(1)}px)`;
+          const el = document.createElement('div');
+          el.className = 'logo-echo';
+          el.style.opacity = op.toFixed(3);
+          pos.appendChild(el);
+          echoLayer.appendChild(pos);
+          echoes.push({ el, dist: i });
+        }
+      }
+      HIST = nPer * DELAY + 8;
+      hist = Array.from({ length: HIST }, () => ({ x: 0, y: 0 }));
+      head = 0;
+    }
+
+    const onMove = (e) => {
+      const r = stage.getBoundingClientRect();
+      gx = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
+      gy = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+    };
+    const onLeave = () => { gx = 0; gy = 0; };
+    stage.addEventListener('pointermove', onMove);
+    stage.addEventListener('pointerleave', onLeave);
+
+    const tf = (x, y) =>
+      `perspective(1000px) rotateX(${(-y * MAXDEG).toFixed(2)}deg) rotateY(${(x * MAXDEG).toFixed(2)}deg)`;
+
+    let raf = null;
+    const frame = () => {
+      tx += (gx - tx) * 0.12;
+      ty += (gy - ty) * 0.12;
+      head = (head + 1) % HIST;
+      hist[head].x = tx; hist[head].y = ty;
+      glass.style.transform = tf(tx, ty);
+      // The frosted base tilts with the plate too (its own transform doesn't kill
+      // its backdrop-filter — only a transformed ancestor would, which is why it
+      // stays a sibling of .logo-glass rather than a child).
+      if (frost) frost.style.transform = tf(tx, ty); // art is a child, tilts with it
+      if (botRim) botRim.style.transform = tf(tx, ty); // top-layer blue rim tilts too
+      if (art) {
+        // art parallax (--px/--py) + reflection sweep: the original copy (--sx/--sy)
+        // and the larger copy (--sx2/--sy2) which moves further for a parallax.
+        art.style.setProperty('--px', (-tx * 16).toFixed(1) + 'px');
+        art.style.setProperty('--py', (-ty * 16).toFixed(1) + 'px');
+        art.style.setProperty('--sx', (tx * 22).toFixed(1) + 'px');
+        art.style.setProperty('--sy', (ty * 22).toFixed(1) + 'px');
+        art.style.setProperty('--sx2', (tx * 35).toFixed(1) + 'px');
+        art.style.setProperty('--sy2', (ty * 35).toFixed(1) + 'px');
+      }
+      for (let k = 0; k < echoes.length; k++) {
+        const e = echoes[k];
+        const h = hist[((head - e.dist * DELAY) % HIST + HIST) % HIST];
+        e.el.style.transform = tf(h.x, h.y);
+      }
+      raf = requestAnimationFrame(frame);
+    };
+
+    let rt = null;
+    const onResize = () => { clearTimeout(rt); rt = setTimeout(buildEchoes, 200); };
+    window.addEventListener('resize', onResize);
+
+    buildEchoes();
+    raf = requestAnimationFrame(frame);
+
+    teardowns.push(() => {
+      stage.removeEventListener('pointermove', onMove);
+      stage.removeEventListener('pointerleave', onLeave);
+      window.removeEventListener('resize', onResize);
+      clearTimeout(rt);
       if (raf != null) cancelAnimationFrame(raf);
     });
   }

@@ -177,15 +177,32 @@
   // --- Rich text editors ----------------------------------------------------
   document.querySelectorAll('[data-richtext]').forEach((rt) => {
     const area = rt.querySelector('.richtext__area');
+    let fsize = 5; // 1–7 scale; 5 (x-large) ≈ the tagline's base, so A−/A+ step sensibly
     rt.querySelectorAll('.richtext__toolbar button').forEach((btn) => {
       btn.addEventListener('mousedown', (e) => e.preventDefault()); // keep selection
       btn.addEventListener('click', async () => {
         const cmd = btn.getAttribute('data-cmd');
         area.focus();
-        if (cmd === 'bold') document.execCommand('bold');
-        else if (cmd === 'italic') document.execCommand('italic');
+        // Bold/italic must emit <b>/<i> tags (not inline styles), because the
+        // sanitizer keeps those tags but only the font-size style — styleWithCSS
+        // is persistent, and the font-size button below turns it on.
+        if (cmd === 'bold') { document.execCommand('styleWithCSS', false); document.execCommand('bold'); }
+        else if (cmd === 'italic') { document.execCommand('styleWithCSS', false); document.execCommand('italic'); }
         else if (cmd === 'h2') document.execCommand('formatBlock', false, 'h2');
         else if (cmd === 'h3') document.execCommand('formatBlock', false, 'h3');
+        else if (cmd === 'p') document.execCommand('formatBlock', false, 'p');
+        else if (cmd === 'fontsize') {
+          fsize = Math.max(1, Math.min(7, fsize + parseInt(btn.dataset.size, 10)));
+          // Size the whole tagline: if nothing is selected, select all of it first
+          // (so a click always has a visible effect, not just at the caret).
+          const sel = window.getSelection();
+          if (!sel.rangeCount || sel.isCollapsed) {
+            const r = document.createRange(); r.selectNodeContents(area);
+            sel.removeAllRanges(); sel.addRange(r);
+          }
+          document.execCommand('styleWithCSS', true); // emit <span style="font-size">, not <font>
+          document.execCommand('fontSize', false, String(fsize));
+        }
         else if (cmd === 'ul') document.execCommand('insertUnorderedList');
         else if (cmd === 'link') {
           const url = prompt('Link URL (https://…)');
@@ -197,6 +214,8 @@
               await api('POST', '/api/settings', { mission: html });
             } else if (rt.dataset.target === 'contact') {
               await api('POST', '/api/settings', { contact: html });
+            } else if (rt.dataset.target === 'home_tagline') {
+              await api('POST', '/api/settings', { home_tagline: html });
             } else if (rt.dataset.taglineGame) {
               await api('PATCH', `/api/games/${rt.dataset.taglineGame}`, { tagline: html });
             } else if (rt.dataset.sectionId) {
@@ -307,6 +326,25 @@
     }).filter((x) => x.mediaId);
   }
 
+  // --- Home social buttons --------------------------------------------------
+  // Rebuild the socials array from the current DOM (so in-progress URL edits are
+  // captured) for any add/remove/icon/url change.
+  function readSocials() {
+    return Array.from(document.querySelectorAll('.home-social .social-edit')).map((el) => ({
+      mediaId: parseInt(el.dataset.socialMedia, 10) || null,
+      url: (el.querySelector('[data-social-url]')?.value || '').trim(),
+    }));
+  }
+  async function saveSocials(arr) {
+    await api('POST', '/api/settings', { home_socials: arr });
+  }
+  document.querySelectorAll('[data-social-url]').forEach((el) => {
+    el.addEventListener('change', async () => {
+      try { await saveSocials(readSocials()); flash('Saved'); }
+      catch (err) { fail(err); }
+    });
+  });
+
   // --- Global click delegation ----------------------------------------------
   document.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-action]');
@@ -356,6 +394,34 @@
         }
         case 'site-logo-remove': {
           await api('POST', '/api/settings', { site_logo: null });
+          reload();
+          break;
+        }
+
+        // ----- home social buttons -----
+        case 'social-add': {
+          const [m] = await uploadFiles({ accept: 'image/*' });
+          if (!m) return;
+          const arr = readSocials();
+          arr.push({ mediaId: m.id, url: '' });
+          await saveSocials(arr);
+          reload();
+          break;
+        }
+        case 'social-icon': {
+          const [m] = await uploadFiles({ accept: 'image/*' });
+          if (!m) return;
+          const arr = readSocials();
+          const i = parseInt(btn.dataset.socialIndex, 10);
+          if (arr[i]) arr[i].mediaId = m.id;
+          await saveSocials(arr);
+          reload();
+          break;
+        }
+        case 'social-remove': {
+          const arr = readSocials();
+          arr.splice(parseInt(btn.dataset.socialIndex, 10), 1);
+          await saveSocials(arr);
           reload();
           break;
         }

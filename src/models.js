@@ -361,6 +361,22 @@ export const Site = {
   setTitle: (v) => setSetting('site_title', v),
   mission: () => getSetting('about_mission', ''),
   setMission: (v) => setSetting('about_mission', v),
+  homeTagline: () =>
+    getSetting(
+      'home_tagline',
+      '9UP is a good company, making games to be enjoyed in good company. We are working on our debut title, Animal Game!'
+    ),
+  setHomeTagline: (v) => setSetting('home_tagline', v),
+  // Homepage social buttons: [{ mediaId, url }] — icon is an uploaded image.
+  homeSocials: () => {
+    try {
+      const v = JSON.parse(getSetting('home_socials', '[]'));
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  },
+  setHomeSocials: (arr) => setSetting('home_socials', JSON.stringify(Array.isArray(arr) ? arr : [])),
   contact: () => getSetting('contact_html', ''),
   setContact: (v) => setSetting('contact_html', v),
   featuredGameId: () => {

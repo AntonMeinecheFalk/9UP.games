@@ -8,6 +8,7 @@ import { getMedia, mediaUrl, thumbUrl, playbackUrl, videoReady } from './media.j
 import { ROOT } from './config.js';
 import {
   Site,
+  Games,
   DEFAULT_THEME,
   THEME_COLOR_KEYS,
   THEME_FONT_KEYS,
@@ -142,6 +143,9 @@ export function layout({ title, body, editMode, extraHead = '', bodyClass = '' }
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="${siteTitle}">
+<link rel="icon" type="image/png" sizes="32x32" href="${assetUrl('img/favicon-32.png')}">
+<link rel="icon" type="image/png" sizes="16x16" href="${assetUrl('img/favicon-16.png')}">
+<link rel="apple-touch-icon" sizes="180x180" href="${assetUrl('img/favicon-180.png')}">
 ${googleFontsLink(theme)}
 <link rel="stylesheet" href="${assetUrl('css/styles.css')}">
 ${themeStyle(theme)}
@@ -253,6 +257,143 @@ function themePanel(theme) {
   </label>
   <button type="button" class="ctl theme-panel__reset" data-action="theme-reset">Reset to defaults</button>
 </div>`;
+}
+
+// --- home landing -----------------------------------------------------------
+// The brand-first homepage: a huge "glass" company logo (the white 9UP
+// silhouette used as a mask) revealing a game's key art in glassy reflection
+// strips, with five outline echoes that lag the logo's hover-tilt to form an
+// outward wave. The interaction (perspective tilt, sliding reflections, echo
+// wave) is wired by app.js → initLogoStage; this is just the layered markup.
+export function renderHomeLanding(editMode) {
+  const games = Games.all();
+  const featuredId = Site.featuredGameId();
+  const featured =
+    (featuredId && Games.get(featuredId)) || games.find((g) => g.hero_media) || games[0] || null;
+  const heroMedia = featured ? getMedia(featured.hero_media) : null;
+  const logoMedia = getMedia(Site.siteLogoId());
+
+  const heroUrl = heroMedia ? mediaUrl(heroMedia) : '';
+  const logoUrl = logoMedia ? mediaUrl(logoMedia) : '';
+
+  // Social buttons are data-driven: each is an uploaded icon + a URL, managed in
+  // edit mode (add / remove / change icon / set URL). See edit.js → social-* actions.
+  const socials = Site.homeSocials();
+  const socialIcon = (s) => {
+    const m = getMedia(s.mediaId);
+    return m ? `<img src="${escapeHtml(mediaUrl(m))}" alt="" class="social-btn__icon">` : '';
+  };
+  let social;
+  if (editMode) {
+    social =
+      socials
+        .map(
+          (s, i) =>
+            `<div class="social-edit" data-social-index="${i}" data-social-media="${escapeHtml(
+              String(s.mediaId || '')
+            )}">
+               <div class="btn social-btn social-btn--preview">${
+                 socialIcon(s) || '<span class="social-btn__ph">?</span>'
+               }</div>
+               <input type="url" class="social-edit__url" data-social-url value="${escapeHtml(
+                 s.url || ''
+               )}" placeholder="https://…">
+               <div class="social-edit__row">
+                 <button type="button" class="ctl" data-action="social-icon" data-social-index="${i}">Change icon</button>
+                 <button type="button" class="ctl ctl--danger" data-action="social-remove" data-social-index="${i}">Remove</button>
+               </div>
+             </div>`
+        )
+        .join('') +
+      `<button type="button" class="social-add" data-action="social-add">+ Add social</button>`;
+  } else {
+    social = socials
+      .map((s) => {
+        const url = safeUrl(s.url) || '#';
+        const ext = url !== '#';
+        return `<a class="btn social-btn" href="${escapeHtml(url)}"${
+          ext ? ' target="_blank" rel="noopener"' : ''
+        } aria-label="Social link">${socialIcon(s)}</a>`;
+      })
+      .join('');
+  }
+
+  // The stage needs the silhouette (mask) + the key art (revealed fill) as CSS vars,
+  // plus the baked logo assets — all version-busted (?v=mtime) so a re-bake is never
+  // served stale from the browser/Cloudflare cache (filenames don't change).
+  const img = (rel) => `url('${assetUrl(rel)}')`;
+  const stageVars =
+    `--logo-mask:url('${escapeHtml(logoUrl)}');--hero-url:url('${escapeHtml(heroUrl)}')` +
+    `;--reflect-mask:${img('img/logo-reflection.png')}` +
+    `;--rim-top:${img('img/logo-rim-top.png')}` +
+    `;--rim-bottom:${img('img/logo-rim-bottom.png')}` +
+    `;--outline:${img('img/logo-outline.png')}`;
+
+  const stage = logoUrl
+    ? `<div class="logo-stage" data-logo-stage style="${stageVars}">
+         <div class="logo-echoes" data-logo-echoes aria-hidden="true"></div>
+         <div class="logo-plate">
+           <div class="lg-frost" aria-hidden="true">
+             <div class="lg-art" data-logo-art></div>
+             <div class="lg-grad lg-grad--bottom"></div>
+             <div class="lg-grad lg-grad--top"></div>
+           </div>
+           <div class="logo-glass" data-logo-glass>
+             <div class="lg-layer lg-rim lg-rim--top"></div>
+           </div>
+           <div class="lg-layer lg-rim lg-rim--bottom" data-logo-botrim></div>
+         </div>
+       </div>`
+    : `<div class="logo-stage logo-stage--empty"><p class="muted">Add a site logo (header → Add logo) to show the glass logo.</p></div>`;
+
+  const tagline = Site.homeTagline();
+  const taglineEl = editMode
+    ? `<div class="home-tagline home-tagline--edit">
+         <div class="richtext" data-richtext data-target="home_tagline">
+           <div class="richtext__toolbar" aria-hidden="true">
+             <button type="button" data-cmd="bold"><b>B</b></button>
+             <button type="button" data-cmd="italic"><i>I</i></button>
+             <button type="button" data-cmd="h2" title="Heading">H2</button>
+             <button type="button" data-cmd="h3" title="Subheading">H3</button>
+             <button type="button" data-cmd="p" title="Normal text">¶</button>
+             <button type="button" data-cmd="fontsize" data-size="-1" title="Smaller text">A&minus;</button>
+             <button type="button" data-cmd="fontsize" data-size="1" title="Larger text">A+</button>
+             <button type="button" data-cmd="ul">• List</button>
+             <button type="button" data-cmd="link">Link</button>
+             <button type="button" data-cmd="save" class="richtext__save">Save</button>
+           </div>
+           <div class="richtext__area prose" contenteditable="true">${tagline}</div>
+         </div>
+       </div>`
+    : `<div class="home-tagline prose">${tagline}</div>`;
+
+  const editTools = editMode
+    ? `<div class="wrap toolbar home-edit">
+         <label class="ctl-inline">Logo art game:
+           <select data-action="set-featured">
+             <option value="">— first with art —</option>
+             ${games
+               .map(
+                 (g) =>
+                   `<option value="${g.id}" ${
+                     featured && g.id === featured.id ? 'selected' : ''
+                   }>${escapeHtml(g.title)}</option>`
+               )
+               .join('')}
+           </select>
+         </label>
+         <span class="muted">The glass logo reveals this game's key art. Edit the logo via the header, the art on the game's page.</span>
+       </div>`
+    : '';
+
+  return `<section class="home-hero">
+    <div class="home-hero__inner">
+      ${stage}
+      ${taglineEl}
+      <div class="home-social${editMode ? ' home-social--edit' : ''}">${social}</div>
+    </div>
+    ${editTools}
+  </section>`;
 }
 
 // --- hero --------------------------------------------------------------------
@@ -527,6 +668,7 @@ function renderText(section, editMode) {
         <button type="button" data-cmd="italic"><i>I</i></button>
         <button type="button" data-cmd="h2">H2</button>
         <button type="button" data-cmd="h3">H3</button>
+        <button type="button" data-cmd="p" title="Normal text">¶</button>
         <button type="button" data-cmd="ul">• List</button>
         <button type="button" data-cmd="link">Link</button>
         <button type="button" data-cmd="save" class="richtext__save">Save</button>
